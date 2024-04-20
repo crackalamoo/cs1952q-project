@@ -1,5 +1,5 @@
 import torch.nn as nn
-from constants import*
+from constants import *
 
 dis_h1 = 256
 dis_h2 = 256
@@ -14,7 +14,7 @@ class Discriminator(nn.Module):
         self.name = name
         self.model = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(img_size*img_size, dis_h1),
+            nn.Linear(img_size*img_size*channels, dis_h1),
             nn.LeakyReLU(0.01),
             nn.Linear(dis_h1, dis_h2),
             nn.LeakyReLU(0.01),
@@ -35,9 +35,9 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.01),
             nn.Linear(gen_h1, gen_h2),
             nn.LeakyReLU(0.01),
-            nn.Linear(gen_h2, img_size*img_size),
+            nn.Linear(gen_h2, img_size*img_size*channels),
             nn.Tanh(),
-            nn.Unflatten(1, (img_size, img_size, channels))
+            nn.Unflatten(1, (channels, img_size, img_size))
         )
 
     def forward(self, x):

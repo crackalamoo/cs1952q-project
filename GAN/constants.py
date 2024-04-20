@@ -1,3 +1,3 @@
-img_size = 28
+img_size = 32
 z_dim = 96
-channels = 1
+channels = 3

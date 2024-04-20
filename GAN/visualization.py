@@ -3,8 +3,8 @@ import io
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from constants import *
 from PIL import Image
-from constants import*
 
 
 class EpochVisualizer:
@@ -19,6 +19,8 @@ class EpochVisualizer:
         x_real = self.sample_inputs[0]
         x_real = x_real.view(-1, channels, img_size, img_size)
         x_fake = x_fake.view(-1, channels, img_size, img_size)
+        x_fake = x_fake.permute(0, 2, 3, 1)
+        x_real = x_real.permute(0, 2, 3, 1)
         d_real = torch.sigmoid(self.model.dis_model(x_real)).detach()
         d_fake = torch.sigmoid(self.model.dis_model(x_fake)).detach()
         outputs = torch.cat([x_real[:4, :, :, :], x_fake[:4, :, :, :]], dim=0)
@@ -36,13 +38,20 @@ class EpochVisualizer:
         fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
         for i, ax in enumerate(axs.flatten()):
             ax.clear()  # Clear previous plots
-            img = outputs[i].squeeze().cpu().detach().numpy()
-            ax.imshow(img, cmap='gray')
+            img = outputs[i].squeeze()
+            img = (img + 1) / 2.0
+            img = img.cpu().detach().numpy()
+            # Normalize the image data
+            if img.max() > 1.0:
+                img = img / 255.0  # Assume the data is in [0, 255]
+            # Ensure imshow uses the correct scale
+            ax.imshow(img, vmin=0, vmax=1)
             ax.set_title(labels[i], fontsize=8)
             ax.axis('off')
         plt.tight_layout()
         self.imgs.append(self.fig2img(fig))
-        plt.close(fig)
+        # plt.close(fig)
+        plt.show()
 
     @staticmethod
     def fig2img(fig):

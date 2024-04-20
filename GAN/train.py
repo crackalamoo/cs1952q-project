@@ -1,12 +1,11 @@
 import torch
+from constants import *
 from gan_core import GAN
 from losses import d_acc_fake, d_acc_real, d_loss, g_acc, g_loss
 from models import Discriminator, Generator
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from visualization import \
-    EpochVisualizer
-from constants import*
+from visualization import EpochVisualizer
 
 # Instantiate models
 dis_model = Discriminator(img_size)
@@ -20,25 +19,29 @@ d_optimizer = torch.optim.Adam(
 g_optimizer = torch.optim.Adam(
     gen_model.parameters(), lr=1e-3, betas=(0.5, 0.999))
 
-# Load MNIST data
+# Load CIFAR10 data
 transform = transforms.Compose([
     transforms.ToTensor(),                      # Convert images to PyTorch tensors
-    transforms.Normalize((0.5,), (0.5,))        # Normalize the tensors
+    # Normalize the tensors; CIFAR10 images are in RGB
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
-mnist_data = datasets.MNIST(
+cifar10_data = datasets.CIFAR10(
     root='./data', train=True, download=True, transform=transform)
-train_loader = DataLoader(mnist_data, batch_size=50, shuffle=True)
+train_loader = DataLoader(cifar10_data, batch_size=50, shuffle=True)
 
 # Prepare sample inputs for visualization
 # 8 examples to generate images from for seeing the evolution
 fixed_z = torch.randn(8, z_dim)
 fixed_x, _ = next(iter(train_loader))
 # Take the first 8 examples for consistency
+print(fixed_x.shape)
 fixed_x = fixed_x.view(fixed_x.size(0), -1)[:8]
 
 visualizer = EpochVisualizer(gan_model, sample_inputs=(fixed_x, fixed_z))
 
 # Training function
+
+
 def train(gan_model, train_loader, visualizer, epochs, dis_steps, gen_steps):
     for epoch in range(epochs):
         for i, (real_images, _) in enumerate(train_loader):
@@ -91,4 +94,4 @@ gen_steps = 5
 train(gan_model, train_loader, visualizer, epochs, dis_steps, gen_steps)
 
 # Optionally save a GIF of the training progress after all epochs
-visualizer.save_gif(filename="mnist_training_progress")
+visualizer.save_gif(filename="cifar10_training_progress")
