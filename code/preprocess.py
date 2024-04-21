@@ -14,8 +14,6 @@ def unpickle(file):
     object produced with cPickle. The code below will open up a 
     "pickled" object (each file) and return a dictionary.
 
-    NOTE: DO NOT EDIT
-
     :param file: the file to unpickle
     :return: dictionary of unpickled data
     """

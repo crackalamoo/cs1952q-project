@@ -166,7 +166,7 @@ def test(model, test_loader):
     return np.mean(accuracy)
 
 
-def interpret(model, interpret_loader):
+def interpret(model, interpret_loader, num_images=15, scuff_steps=15):
     '''
     ....
 
@@ -188,9 +188,12 @@ def interpret(model, interpret_loader):
         return torch.sum(torch.mul(a, b))
 
     for i, (inputs, labels) in enumerate(interpret_loader):
+        if i == num_images:
+            break
         inputs, labels = inputs.to(device), labels.to(device)
         x_var = torch.tensor(inputs.clone().detach(), device=device, requires_grad=True)
-        for _ in range(15):
+        scuffed_i = [inputs]
+        for _ in range(scuff_steps):
             outputs = torch.nn.functional.softmax(model(x_var, is_interpret=True), dim=1)[0][0]
             if _ == 0:
                 initial_pred = outputs.clone().detach().tolist()
@@ -207,13 +210,12 @@ def interpret(model, interpret_loader):
             perp = v - u_dot_v * grads
             perp = img_norm(perp)
             x_var = x_var + perp
+            scuffed_i.append(x_var.clone().detach())
         final_outputs = torch.nn.functional.softmax(model(x_var, is_interpret=True), dim=1)
         final_pred = final_outputs[0][0].tolist()
         print(f"PRED: {initial_pred} -> {final_pred}")
         print(f"X: {inputs[0, :, 8, 8].tolist()} -> {x_var[0, :, 8, 8].tolist()}")
-        scuffed_inputs.append(x_var.detach())
-        if i == 15:
-            break
+        scuffed_inputs.append(scuffed_i)
 
     return scuffed_inputs
 
@@ -225,31 +227,25 @@ def tensor_to_image(tensor):
     tensor = tensor * 255  # Assuming the tensor is in [0, 1]
     tensor = tensor.to(dtype=torch.uint8)
     tensor = torch.permute(tensor, (1, 2, 0))
-    print(f"IMAGE SHAPE: {tensor.shape}")
     return Image.fromarray(tensor.numpy())
 
 
-def visualize(images, folder_path='../visualized_images'):
+def visualize_interpret(images, folder_path='../visualized_images'):
     """
     Saves a list of PyTorch tensors as RGB images in the specified folder.
 
     Args:
-    images (list of torch.Tensor): List of PyTorch tensors to be converted to images.
+    images (list of List[torch.Tensor]): List of lists of PyTorch tensors to be converted to animations.
     folder_path (str): Path to the folder where images will be saved.
     """
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
-    for idx, img_tensor in enumerate(images):
-        print(f"SHAPE: {img_tensor.shape}")
-        print(f"SHAPE: {img_tensor[0].shape}")
+    for idx, img_tensors in enumerate(images):
         # Check if the image tensor is a valid image format
-        if len(img_tensor[0].shape) == 3 and img_tensor[0].size(0) == 3:
-            img = tensor_to_image(img_tensor[0])
-            img.save(os.path.join(folder_path, f'image_{idx+1}.png'))
-        else:
-            print(
-                f"Skipping tensor {idx+1} as it does not conform to RGB image dimensions.")
+        imgs = [tensor_to_image(img_tensor[0]) for img_tensor in img_tensors]
+        with open(os.path.join(folder_path, f'image_{idx+1}.gif'), 'wb') as f:
+            imgs[0].save(f, save_all=True, append_images=imgs[1:], duration=100, loop=0)
 
 
 def visualize_loss(losses):
@@ -257,8 +253,6 @@ def visualize_loss(losses):
     Uses Matplotlib to visualize the losses of our model.
     :param losses: list of loss data stored from train. Can use the model's loss_list 
     field 
-
-    NOTE: DO NOT EDIT
 
     :return: doesn't return anything, a plot should pop-up 
     """
@@ -278,8 +272,6 @@ def visualize_results(image_inputs, probabilities, image_labels, first_label, se
     :param image_labels: the labels from get_data(), shape (50, num_classes)
     :param first_label: the name of the first class, "cat"
     :param second_label: the name of the second class, "dog"
-
-    NOTE: DO NOT EDIT
 
     :return: doesn't return anything, two plots should pop-up, one for correct results,
     one for incorrect results
@@ -356,7 +348,8 @@ def main():
     test_acc = test(model, test_loader)
     print(f"Test Accuracy: {test_acc}")
 
-    visualize(interpret(model, interpret_loader))
+    scuffed_inputs = interpret(model, interpret_loader)
+    visualize_interpret(scuffed_inputs)
 
 
 if __name__ == '__main__':
