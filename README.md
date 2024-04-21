@@ -1,1 +1,1 @@
-# natural-diffusion
+# CSCI 1952Q Final Project
