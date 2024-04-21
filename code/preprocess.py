@@ -2,7 +2,8 @@ import os
 import pickle
 
 import numpy as np
-import tensorflow as tf
+import torch
+from torch.utils.data import TensorDataset, DataLoader
 
 
 def unpickle(file):
@@ -23,7 +24,7 @@ def unpickle(file):
     return dict
 
 
-def get_data(file_path, first_class, second_class):
+def get_data(file_path, first_class, second_class, batch_size=64, shuffle=True):
     """
     Given a file path and two target classes, returns an array of 
     normalized inputs (images) and an array of labels. 
@@ -33,7 +34,7 @@ def get_data(file_path, first_class, second_class):
     into one hot vectors using tf.one_hot().
     Note that because you are using tf.one_hot() for your labels, your
     labels will be a Tensor, while your inputs will be a NumPy array. This 
-    is fine because TensorFlow works with NumPy arrays.
+    is fine because PyTorch works with NumPy arrays.
     :param file_path: file path for inputs and labels, something 
     like 'CIFAR_data_compressed/train'
     :param first_class:  an integer (0-9) representing the first target
@@ -55,12 +56,17 @@ def get_data(file_path, first_class, second_class):
     inputs = inputs[(labels == first_class) | (labels == second_class)]
     labels = labels[(labels == first_class) | (labels == second_class)]
 
-    inputs = tf.reshape(inputs, (-1, 3, 32, 32))
-    inputs = tf.transpose(inputs, perm=[0, 2, 3, 1])
-
+    inputs = torch.tensor(inputs, dtype=torch.float32)
     labels = np.where(labels == first_class, 0, 1)
-    labels = tf.one_hot(labels, depth=2)
+    labels = torch.nn.functional.one_hot(torch.tensor(labels), num_classes=2)
 
-    inputs /= 255
+    # Reshape and transpose images to match PyTorch's convention (num_inputs, num_channels, width, height)
+    inputs = inputs.view(-1, 3, 32, 32)
 
-    return inputs, labels
+    # Normalize inputs
+    inputs /= 255.0
+
+    dataset = TensorDataset(inputs, labels)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+    return data_loader

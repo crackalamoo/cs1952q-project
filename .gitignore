@@ -163,3 +163,4 @@ cython_debug/
 
 data/*
 visualized_images/*
+code/.DS_Store
