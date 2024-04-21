@@ -22,7 +22,7 @@ def unpickle(file):
     return dict
 
 
-def get_data(file_path, first_class, second_class, batch_size=64, shuffle=True):
+def get_data(file_path, batch_size=64, shuffle=True):
     """
     Given a file path and two target classes, returns an array of 
     normalized inputs (images) and an array of labels. 
@@ -51,12 +51,8 @@ def get_data(file_path, first_class, second_class, batch_size=64, shuffle=True):
     inputs = np.asarray(inputs)
     labels = np.asarray(labels)
 
-    inputs = inputs[(labels == first_class) | (labels == second_class)]
-    labels = labels[(labels == first_class) | (labels == second_class)]
-
     inputs = torch.tensor(inputs, dtype=torch.float32)
-    labels = np.where(labels == first_class, 0, 1)
-    labels = torch.nn.functional.one_hot(torch.tensor(labels), num_classes=2)
+    labels = torch.nn.functional.one_hot(torch.tensor(labels), num_classes=10)
 
     # Reshape and transpose images to match PyTorch's convention (num_inputs, num_channels, width, height)
     inputs = inputs.view(-1, 3, 32, 32)

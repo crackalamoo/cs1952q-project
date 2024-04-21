@@ -24,7 +24,7 @@ class Model(torch.nn.Module):
         super(Model, self).__init__()
 
         self.batch_size = 64
-        self.num_classes = 2
+        self.num_classes = 10
         # Append losses to this list in training so you can visualize loss vs time in main
         self.loss_list = []
 
@@ -166,7 +166,7 @@ def test(model, test_loader):
     return np.mean(accuracy)
 
 
-def interpret(model, interpret_loader, num_images=15, scuff_steps=15):
+def interpret(model, interpret_loader, num_images=15, scuff_steps=50):
     '''
     ....
 
@@ -191,10 +191,11 @@ def interpret(model, interpret_loader, num_images=15, scuff_steps=15):
         if i == num_images:
             break
         inputs, labels = inputs.to(device), labels.to(device)
+        label = torch.argmax(labels, dim=1).item()
         x_var = torch.tensor(inputs.clone().detach(), device=device, requires_grad=True)
         scuffed_i = [inputs]
         for _ in range(scuff_steps):
-            outputs = torch.nn.functional.softmax(model(x_var, is_interpret=True), dim=1)[0][0]
+            outputs = torch.nn.functional.softmax(model(x_var, is_interpret=True), dim=1)[0][label]
             if _ == 0:
                 initial_pred = outputs.clone().detach().tolist()
             model.zero_grad()
@@ -212,7 +213,7 @@ def interpret(model, interpret_loader, num_images=15, scuff_steps=15):
             x_var = x_var + perp
             scuffed_i.append(x_var.clone().detach())
         final_outputs = torch.nn.functional.softmax(model(x_var, is_interpret=True), dim=1)
-        final_pred = final_outputs[0][0].tolist()
+        final_pred = final_outputs[0][label].tolist()
         print(f"PRED: {initial_pred} -> {final_pred}")
         print(f"X: {inputs[0, :, 8, 8].tolist()} -> {x_var[0, :, 8, 8].tolist()}")
         scuffed_inputs.append(scuffed_i)
@@ -336,9 +337,9 @@ def main():
     # Instantiate our model
     model = Model()
 
-    train_loader = get_data(AUTOGRADER_TRAIN_FILE, 3, 5)
-    test_loader = get_data(AUTOGRADER_TEST_FILE, 3, 5)
-    interpret_loader = get_data(AUTOGRADER_TEST_FILE, 3, 5, batch_size=1)
+    train_loader = get_data(AUTOGRADER_TRAIN_FILE)
+    test_loader = get_data(AUTOGRADER_TEST_FILE)
+    interpret_loader = get_data(AUTOGRADER_TEST_FILE, batch_size=1)
 
     epochs = 1
     for epoch in range(epochs):
