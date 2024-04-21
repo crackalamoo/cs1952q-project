@@ -15,24 +15,23 @@ class Cifar10Model(torch.nn.Module):
         self.loss_list = []
 
         # Initialize all hyperparameters
-        self.learning_rate = 1e-3
         self.hidden_layer1 = 2*2*20
         self.hidden_layer2 = 2*20
         self.dropout_rate = 0.25
 
-        conv_fn1 = torch.nn.Conv2d(3, 16, 5, stride=2, padding=2)
-        conv_fn2 = torch.nn.Conv2d(16, 20, 5, stride=2, padding=2)
-        conv_fn3 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
+        self.conv_fn1 = torch.nn.Conv2d(3, 16, 5, stride=2, padding=2)
+        self.conv_fn2 = torch.nn.Conv2d(16, 20, 5, stride=2, padding=2)
+        self.conv_fn3 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
         pool_fn1 = torch.nn.MaxPool2d(3, stride=2, padding=1)
         pool_fn2 = torch.nn.AvgPool2d(2, stride=2)
         pool_fn3 = lambda l: l
-        batch_norm1 = torch.nn.BatchNorm2d(16)
-        batch_norm2 = torch.nn.BatchNorm2d(20)
-        batch_norm3 = torch.nn.BatchNorm2d(20)
+        self.batch_norm1 = torch.nn.BatchNorm2d(16)
+        self.batch_norm2 = torch.nn.BatchNorm2d(20)
+        self.batch_norm3 = torch.nn.BatchNorm2d(20)
 
-        self.conv_fns = [conv_fn1, conv_fn2, conv_fn3]
+        self.conv_fns = [self.conv_fn1, self.conv_fn2, self.conv_fn3]
         self.pool_fns = [pool_fn1, pool_fn2, pool_fn3]
-        self.batch_fns = [batch_norm1, batch_norm2, batch_norm3]
+        self.batch_fns = [self.batch_norm1, self.batch_norm2, self.batch_norm3]
         self.dropout = torch.nn.Dropout(self.dropout_rate)
         self.linear = torch.nn.Linear(20*2*2, self.hidden_layer1)
         self.hidden1 = torch.nn.Linear(self.hidden_layer1, self.hidden_layer2)
@@ -40,8 +39,6 @@ class Cifar10Model(torch.nn.Module):
         self.linears = [self.linear, self.hidden1, self.hidden2]
 
         self.flatten = torch.nn.Flatten()
-
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, inputs, is_testing=False, is_interpret=False):
         """

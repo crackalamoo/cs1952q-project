@@ -1,17 +1,22 @@
 from __future__ import absolute_import
 
+import argparse
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
 from preprocess import get_data
 from cifar10 import Cifar10Model
 from visuals import save_tensor_gifs
 
-# ensures that we run only on cpu
-device = "cpu"
+parser = argparse.ArgumentParser()
+parser.add_argument("--force-train", action=argparse.BooleanOptionalAction)
+parser.add_argument("--device")
+args = parser.parse_args()
+
+FORCE_TRAIN = args.force_train or False
+device = args.device or "cpu"
 
 
-def train(model, train_loader):
+def train(model, train_loader, lr=1e-3):
     '''
     Trains the model on all of the inputs and labels for one epoch.
 
@@ -22,16 +27,18 @@ def train(model, train_loader):
     shape (num_labels, num_classes)
     :return: Return the average accuracy across batches of the train inputs/labels
     '''
+    model.to(device)
     model.train()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     accuracy = []
     for inputs, labels in train_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-        model.optimizer.zero_grad()
+        optimizer.zero_grad()
         outputs = model(inputs)
         loss = model.loss(outputs, labels)
         accuracy.append(model.accuracy(outputs, labels))
         loss.backward()
-        model.optimizer.step()
+        optimizer.step()
     return np.mean(accuracy)
 
 def test(model, test_loader):
@@ -47,11 +54,12 @@ def test(model, test_loader):
     :return: test accuracy - this should be the average accuracy across
     all batches
     """
+    model.to("cpu")
     model.eval()
     accuracy = []
     with torch.no_grad():
         for inputs, labels in test_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs, labels
             outputs = model(inputs)
             accuracy.append(model.accuracy(outputs, labels))
     return np.mean(accuracy)
@@ -68,6 +76,7 @@ def interpret(model, interpret_loader, visualization_f, num_inputs=15, scuff_ste
     :return: Return the average accuracy across batches of the train inputs/labels
     '''
 
+    model.to("cpu")
     model.eval()
     scuffed_inputs = []
 
@@ -80,7 +89,6 @@ def interpret(model, interpret_loader, visualization_f, num_inputs=15, scuff_ste
     for i, (inputs, labels) in enumerate(interpret_loader):
         if i == num_inputs:
             break
-        inputs, labels = inputs.to(device), labels.to(device)
         label = torch.argmax(labels, dim=1).item()
         x_var = inputs.clone().detach().requires_grad_(True)
         scuffed_i = [inputs]
@@ -111,17 +119,20 @@ def interpret(model, interpret_loader, visualization_f, num_inputs=15, scuff_ste
     visualization_f(scuffed_inputs)
     return scuffed_inputs
 
-def load_or_train_model(ModelClass, train_loader, save_path):
+def load_or_train_model(ModelClass, train_loader, save_path, epochs=1, force_train=False):
     model = ModelClass()
-    try:
-        model.load_state_dict(torch.load(save_path))
-        print("LOADED MODEL")
-    except FileNotFoundError:
-        epochs = 1
+    def do_train():
         for epoch in range(epochs):
             train_acc = train(model, train_loader)
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         torch.save(model.state_dict(), save_path)
+    if force_train: do_train()
+    else:
+        try:
+            model.load_state_dict(torch.load(save_path))
+            print("LOADED MODEL")
+        except FileNotFoundError:
+            do_train()
     return model
 
 
@@ -142,16 +153,17 @@ def main():
 
     :return: None
     '''
-    #       Use the local filepaths when running on your local machine.
-    AUTOGRADER_TRAIN_FILE = '../data/train'
-    AUTOGRADER_TEST_FILE = '../data/test'
+    # Use the local filepaths when running on your local machine.
+    AUTOGRADER_TRAIN_FILE = '../data/cifar10_train'
+    AUTOGRADER_TEST_FILE = '../data/cifar10_test'
 
     train_loader = get_data(AUTOGRADER_TRAIN_FILE)
     test_loader = get_data(AUTOGRADER_TEST_FILE)
     interpret_loader = get_data(AUTOGRADER_TEST_FILE, batch_size=1)
 
     # Instantiate our model
-    model = load_or_train_model(Cifar10Model, train_loader, '../models/cifar10.pt')
+    model = load_or_train_model(Cifar10Model, train_loader, '../models/cifar10.pt',
+                                epochs=10, force_train=FORCE_TRAIN)
 
     test_acc = test(model, test_loader)
     print(f"Test Accuracy: {test_acc}")
