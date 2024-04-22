@@ -61,6 +61,7 @@ def get_image_classifier_data(file_path, classes=None, batch_size=64, shuffle=Tr
 
     inputs = torch.tensor(inputs, dtype=torch.float32)
     labels = torch.nn.functional.one_hot(torch.tensor(labels), num_classes=(10 if classes is None else len(classes)))
+    idxs = torch.arange(0, inputs.size(0))
 
     # Reshape and transpose images to match PyTorch's convention (num_inputs, num_channels, width, height)
     inputs = inputs.view(-1, 3, 32, 32)
@@ -68,7 +69,7 @@ def get_image_classifier_data(file_path, classes=None, batch_size=64, shuffle=Tr
     # Normalize inputs
     inputs /= 255.0
 
-    dataset = TensorDataset(inputs, labels)
+    dataset = TensorDataset(inputs, labels, idxs)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     return data_loader

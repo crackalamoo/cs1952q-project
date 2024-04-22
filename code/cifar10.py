@@ -109,6 +109,5 @@ def get_cifar10_data():
 
     train_loader = get_image_classifier_data(AUTOGRADER_TRAIN_FILE)
     test_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE)
-    interpret_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE, batch_size=1)
 
-    return train_loader, test_loader, interpret_loader
+    return train_loader, test_loader
