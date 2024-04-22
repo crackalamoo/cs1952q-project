@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from cifar10 import Cifar10Model, get_cifar10_data
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--force-train", action=argparse.BooleanOptionalAction)
@@ -14,22 +15,27 @@ parser.add_argument("--epochs")
 args = parser.parse_args()
 
 FORCE_TRAIN = args.force_train or False
-EPOCHS = int(args.epochs) or 10
+EPOCHS = int(args.epochs) if args.epochs is not None else 10
 device = args.device or "cpu"
 LOSS_THRESHOLD = 0.1
 
-def load_curriculum(train_loader, batch_size=None):
+def load_curriculum(train_loader, sample_losses, batch_size=None):
     if batch_size is None: batch_size = train_loader.batch_size
 
     dataset = train_loader.dataset
-    keep_idx = list(range(1, len(dataset)))
-    learned_idx = [0]
-    subset = Subset(dataset, keep_idx)
+    keep_idx = set()
+    learned_idx = set()
+    for idx in sample_losses:
+        if np.mean(sample_losses[idx]) > 1e-1:
+            keep_idx.add(idx.item())
+        else:
+            learned_idx.add(idx.item())
+    subset = Subset(dataset, list(keep_idx))
 
     training = DataLoader(subset, batch_size=batch_size, shuffle=True)
     return training, learned_idx
 
-def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=False, lr=1e-3):
+def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=True, lr=1e-3):
     '''
     Trains the model on all of the inputs and labels.
 
@@ -44,20 +50,26 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=Fa
     accuracies = []
     val_losses = []
     val_accuracies = []
-    training = []
-    learned = []
+    training = train_loader
+    learned = set()
+    sample_losses = defaultdict(lambda: 900*np.ones(5))
     for epoch in range(epochs):
         model.to(device)
         model.train()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         accuracy = []
         epoch_losses = []
-        training, learned = load_curriculum(train_loader)
+        if use_curriculum and epoch > 0:
+            training, learned = load_curriculum(train_loader, sample_losses)
         for inputs, labels, idxs in training:
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = model.loss(outputs, labels)
+            batch_losses = torch.nn.functional.cross_entropy(outputs, labels.float(), reduction='none')
+            for idx, loss_i in zip(idxs, batch_losses):
+                sample_losses[idx] = np.roll(sample_losses[idx], -1)
+                sample_losses[idx][-1] = loss_i.item()
+            loss = torch.mean(batch_losses)
             accuracy.append(model.accuracy(outputs, labels))
             loss.backward()
             optimizer.step()
