@@ -17,7 +17,7 @@ args = parser.parse_args()
 EPOCHS = int(args.epochs) if args.epochs is not None else 20
 device = args.device or "cpu"
 USE_CURRICULUM = True
-LOSS_THRESHOLD = 1.0
+LOSS_THRESHOLD = 0.8
 REINTRODUCE_LEARNED = 0.1
 STORED_LOSSES = 3
 LR = 2e-3
@@ -135,9 +135,16 @@ def main():
         plt.savefig('../results/reg_train_val.png')
 
     plt.figure()
-    plt.plot(train_times, train_acc)
-    plt.plot(train_times, val_acc)
-    plt.plot(train_times[STORED_LOSSES:], proportions[STORED_LOSSES:])
+    plt.plot(train_times, train_acc, label='train accuracy')
+    plt.plot(train_times, val_acc, label='validation accuracy')
+    plt.plot(train_times[STORED_LOSSES:], proportions[STORED_LOSSES:], label='proportion')
+    plt.xlabel("Time (s)")
+    plt.ylabel("Accuracy/proportion")
+    plt.title("Accuracy and training proportion over time")
+    if USE_CURRICULUM:
+        plt.savefig('../results/cur_acc.png')
+    else:
+        plt.savefig('../results/reg_acc.png')
 
     fname = 'cur' if USE_CURRICULUM else 'reg'
     with open(f'../results/{fname}.npy', 'wb') as f:
