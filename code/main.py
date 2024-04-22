@@ -18,8 +18,8 @@ args = parser.parse_args()
 EPOCHS = int(args.epochs) if args.epochs is not None else 20
 device = args.device or "cpu"
 USE_CURRICULUM = True
-LOSS_THRESHOLD = 0.9
-LOSS_THRESHOLD_VELOCITY = 0.9
+LOSS_THRESHOLD = 1.0
+LOSS_THRESHOLD_VELOCITY = 0.03
 REINTRODUCE_LEARNED = 0.05
 STORED_LOSSES = 3
 LR = 2e-3
@@ -32,7 +32,7 @@ def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
     dataset = train_loader.dataset
     keep_idx = set()
     for idx in sample_losses:
-        if np.mean(sample_losses[idx]) > (LOSS_THRESHOLD * LOSS_THRESHOLD_VELOCITY**epoch) or np.random.random() < REINTRODUCE_LEARNED:
+        if np.mean(sample_losses[idx]) > (LOSS_THRESHOLD - LOSS_THRESHOLD_VELOCITY*epoch) or np.random.random() < REINTRODUCE_LEARNED:
             keep_idx.add(idx)
     subset = Subset(dataset, list(keep_idx))
     proportion = len(keep_idx)/(len(train_loader)*batch_size)
@@ -153,6 +153,7 @@ def main():
     plt.xlabel("Time (s)")
     plt.ylabel("Accuracy/proportion")
     plt.title("Accuracy and training proportion over time")
+    plt.legend()
     if USE_CURRICULUM:
         plt.savefig('../results/cur_acc.png')
     else:
