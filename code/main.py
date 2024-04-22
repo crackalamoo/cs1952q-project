@@ -1,13 +1,14 @@
 from __future__ import absolute_import
 
-import time
 import argparse
+import time
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Subset
 from cifar10 import Cifar10Model, get_cifar10_data
-import matplotlib.pyplot as plt
-from collections import defaultdict
+from torch.utils.data import DataLoader, Subset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--device")
@@ -17,18 +18,21 @@ args = parser.parse_args()
 EPOCHS = int(args.epochs) if args.epochs is not None else 20
 device = args.device or "cpu"
 USE_CURRICULUM = True
-LOSS_THRESHOLD = 0.8
-REINTRODUCE_LEARNED = 0.1
+LOSS_THRESHOLD = 0.9
+LOSS_THRESHOLD_VELOCITY = 0.9
+REINTRODUCE_LEARNED = 0.05
 STORED_LOSSES = 3
 LR = 2e-3
 
-def load_curriculum(train_loader, sample_losses, batch_size=None):
-    if batch_size is None: batch_size = train_loader.batch_size
+
+def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
+    if batch_size is None:
+        batch_size = train_loader.batch_size
 
     dataset = train_loader.dataset
     keep_idx = set()
     for idx in sample_losses:
-        if np.mean(sample_losses[idx]) > LOSS_THRESHOLD or np.random.random() < REINTRODUCE_LEARNED:
+        if np.mean(sample_losses[idx]) > (LOSS_THRESHOLD * LOSS_THRESHOLD_VELOCITY**epoch) or np.random.random() < REINTRODUCE_LEARNED:
             keep_idx.add(idx)
     subset = Subset(dataset, list(keep_idx))
     proportion = len(keep_idx)/(len(train_loader)*batch_size)
@@ -36,6 +40,7 @@ def load_curriculum(train_loader, sample_losses, batch_size=None):
 
     training = DataLoader(subset, batch_size=batch_size, shuffle=True)
     return training, proportion
+
 
 def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=USE_CURRICULUM, lr=LR):
     losses = []
@@ -54,7 +59,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         accuracy = []
         epoch_losses = []
         if use_curriculum and epoch >= STORED_LOSSES:
-            training, proportion = load_curriculum(train_loader, sample_losses)
+            training, proportion = load_curriculum(
+                train_loader, sample_losses, epoch)
             proportions.append(proportion)
         else:
             proportions.append(1)
@@ -62,7 +68,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
-            batch_losses = torch.nn.functional.cross_entropy(outputs, labels.float(), reduction='none')
+            batch_losses = torch.nn.functional.cross_entropy(
+                outputs, labels.float(), reduction='none')
             for idx, loss_i in zip(idxs, batch_losses):
                 idx = idx.item()
                 sample_losses[idx] = np.roll(sample_losses[idx], -1)
@@ -79,7 +86,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
             val_loss, val_acc = test(model, val_loader)
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
-            print(f"Epoch: {epoch}, Training Accuracy: {train_acc}, Validation Accuracy: {val_acc}")
+            print(
+                f"Epoch: {epoch}, Training Accuracy: {train_acc}, Validation Accuracy: {val_acc}")
         else:
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)
@@ -89,6 +97,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
             'times': times, 'prop': proportions
         }
     return losses, accuracies, times
+
 
 def test(model, test_loader):
     model.to("cpu")
@@ -105,14 +114,16 @@ def test(model, test_loader):
     test_loss = np.mean(losses)
     return test_loss, test_acc
 
+
 def main():
     train_loader, test_loader = get_cifar10_data()
 
     model = Cifar10Model()
-    train_res = train(model, train_loader, val_loader=test_loader, epochs=EPOCHS)
+    train_res = train(model, train_loader,
+                      val_loader=test_loader, epochs=EPOCHS)
     train_loss, train_acc, val_loss, val_acc, train_times, proportions = (train_res['loss'],
-        train_res['acc'], train_res['val_loss'], train_res['val_acc'],
-        train_res['times'], train_res['prop'])
+                                                                          train_res['acc'], train_res['val_loss'], train_res['val_acc'],
+                                                                          train_res['times'], train_res['prop'])
 
     test_loss, test_acc = test(model, test_loader)
 
@@ -137,7 +148,8 @@ def main():
     plt.figure()
     plt.plot(train_times, train_acc, label='train accuracy')
     plt.plot(train_times, val_acc, label='validation accuracy')
-    plt.plot(train_times[STORED_LOSSES:], proportions[STORED_LOSSES:], label='proportion')
+    plt.plot(train_times[STORED_LOSSES:],
+             proportions[STORED_LOSSES:], label='proportion')
     plt.xlabel("Time (s)")
     plt.ylabel("Accuracy/proportion")
     plt.title("Accuracy and training proportion over time")
@@ -151,7 +163,7 @@ def main():
         np.save(f, train_times)
         np.save(f, val_loss)
         np.save(f, val_acc)
-    
+
     if USE_CURRICULUM:
         try:
             with open(f'../results/reg.npy', 'rb') as f:
@@ -161,7 +173,8 @@ def main():
             plt.figure()
             plt.plot(train_times, val_acc, label='curriculum')
             plt.plot(reg_times, reg_acc, label='no curriculum')
-            plt.plot(train_times[STORED_LOSSES:], proportions[STORED_LOSSES:], label='proportion')
+            plt.plot(train_times[STORED_LOSSES:],
+                     proportions[STORED_LOSSES:], label='proportion')
             plt.xlabel('Time (s)')
             plt.ylabel('Accuracy/proportion')
             plt.title('Faster convergence and comparable performance on CIFAR-10')
@@ -176,7 +189,8 @@ def main():
             plt.title('Faster convergence and comparable performance on CIFAR-10')
             plt.legend()
             plt.savefig('../results/cur_vs_reg_loss.png')
-        except FileNotFoundError: pass
+        except FileNotFoundError:
+            pass
 
     plt.show()
 
