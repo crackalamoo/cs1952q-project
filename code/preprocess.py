@@ -1,4 +1,3 @@
-import os
 import pickle
 
 import numpy as np
@@ -22,7 +21,7 @@ def unpickle(file):
     return dict
 
 
-def get_data(file_path, batch_size=64, shuffle=True):
+def get_image_classifier_data(file_path, classes=None, batch_size=64, shuffle=True):
     """
     Given a file path and two target classes, returns an array of 
     normalized inputs (images) and an array of labels. 
@@ -51,8 +50,17 @@ def get_data(file_path, batch_size=64, shuffle=True):
     inputs = np.asarray(inputs)
     labels = np.asarray(labels)
 
+    if classes is not None:
+        indexing = (labels == classes[0])
+        for i in range(1, len(classes)):
+            indexing |= (labels == classes[i])
+        inputs = inputs[indexing]
+        labels = labels[indexing]
+        vfunc = np.vectorize(lambda l: classes.index(l))
+        labels = vfunc(labels)
+
     inputs = torch.tensor(inputs, dtype=torch.float32)
-    labels = torch.nn.functional.one_hot(torch.tensor(labels), num_classes=10)
+    labels = torch.nn.functional.one_hot(torch.tensor(labels), num_classes=(10 if classes is None else len(classes)))
 
     # Reshape and transpose images to match PyTorch's convention (num_inputs, num_channels, width, height)
     inputs = inputs.view(-1, 3, 32, 32)

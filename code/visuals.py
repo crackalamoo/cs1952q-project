@@ -2,19 +2,26 @@ import os
 import torch
 from PIL import Image
 import matplotlib.pyplot as plt
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import numpy as np
 import math
 
-def tensor_to_image(tensor):
+def tensor_to_numpy_image(tensor):
     """
-    Converts a PyTorch tensor to a PIL Image and normalizes the data.
+    Converts a PyTorch tensor to a NumPy Image and normalizes the data.
     """
     tensor = tensor * 255  # Assuming the tensor is in [0, 1]
     tensor = tensor.to(dtype=torch.uint8)
     tensor = torch.permute(tensor, (1, 2, 0))
-    return Image.fromarray(tensor.numpy())
+    res = tensor.numpy()
+    return res
+def tensor_to_image(tensor):
+    """
+    Converts a PyTorch tensor to a PIL Image and normalizes the data.
+    """
+    return Image.fromarray(tensor_to_numpy_image(tensor))
 
-def save_tensor_gifs(images, folder_path='../visualized_images'):
+def visualize_interpret_images(images, preds, folder_path='../visualized_images'):
     """
     Saves a list of PyTorch tensors as RGB images in the specified folder.
 
@@ -30,6 +37,30 @@ def save_tensor_gifs(images, folder_path='../visualized_images'):
         imgs = [tensor_to_image(img_tensor[0]) for img_tensor in img_tensors]
         with open(os.path.join(folder_path, f'image_{idx+1}.gif'), 'wb') as f:
             imgs[0].save(f, save_all=True, append_images=imgs[1:], duration=100, loop=0)
+    
+    preds = np.array(preds)
+    pred_len = preds.shape[1]
+    # best_pred_idx = np.argmax(preds[:,0])
+    best_pred_idx = np.random.randint(0, preds.shape[0])
+    best_pred = preds[best_pred_idx,:]
+    plot_img_idxs = [0, pred_len//4, pred_len*2//4, pred_len*3//4, pred_len-1]
+    best_pred_imgs = list(map(lambda i: tensor_to_numpy_image(i[0]), images[best_pred_idx]))
+    y_img_size = np.max(best_pred) - np.min(best_pred)
+    
+    
+    plt.plot(np.arange(len(best_pred)), best_pred)
+    plt.scatter(plot_img_idxs, best_pred[plot_img_idxs])
+    for idx in plot_img_idxs:
+        img = best_pred_imgs[idx]
+        x = np.clip(idx, pred_len*0.05, pred_len*0.95)
+        y = best_pred[idx]
+        if y > 0.5*y_img_size+np.min(best_pred):
+            y -= 0.1*y_img_size
+        else:
+            y += 0.1*y_img_size
+        ab = AnnotationBbox(OffsetImage(img, zoom=2), (x,y), frameon=False)
+        plt.gca().add_artist(ab)
+    plt.show()
 
 
 def visualize_results(image_inputs, probabilities, image_labels, first_label, second_label):

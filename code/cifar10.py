@@ -1,4 +1,5 @@
 import torch
+from preprocess import get_image_classifier_data
 
 class Cifar10Model(torch.nn.Module):
     def __init__(self):
@@ -40,7 +41,7 @@ class Cifar10Model(torch.nn.Module):
 
         self.flatten = torch.nn.Flatten()
 
-    def forward(self, inputs, is_testing=False, is_interpret=False):
+    def forward(self, inputs, is_interpret=False):
         """
         Runs a forward pass on an input batch of images.
 
@@ -101,3 +102,13 @@ class Cifar10Model(torch.nn.Module):
         correct_predictions = (predicted == correct).sum().item()
         total = labels.size(0)
         return correct_predictions / total
+
+def get_cifar10_data():
+    AUTOGRADER_TRAIN_FILE = '../data/cifar10_train'
+    AUTOGRADER_TEST_FILE = '../data/cifar10_test'
+
+    train_loader = get_image_classifier_data(AUTOGRADER_TRAIN_FILE)
+    test_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE)
+    interpret_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE, batch_size=1)
+
+    return train_loader, test_loader, interpret_loader
