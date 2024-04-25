@@ -15,14 +15,15 @@ parser.add_argument("--device")
 parser.add_argument("--epochs")
 args = parser.parse_args()
 
-EPOCHS = int(args.epochs) if args.epochs is not None else 20
+EPOCHS = int(args.epochs) if args.epochs is not None else 10
 device = args.device or "cpu"
 USE_CURRICULUM = True
-LOSS_THRESHOLD = 1.0
-LOSS_THRESHOLD_VELOCITY = 0.03
-REINTRODUCE_LEARNED = 0.05
+LOSS_THRESHOLD = 0.9
+LOSS_THRESHOLD_VELOCITY = 0
+FORCE_PROPORTION = 0.7
+REINTRODUCE_LEARNED = 0.4
 STORED_LOSSES = 3
-LR = 2e-3
+LR = 1e-3
 
 
 def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
@@ -30,9 +31,16 @@ def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
         batch_size = train_loader.batch_size
 
     dataset = train_loader.dataset
+    if FORCE_PROPORTION is None:
+        threshold = LOSS_THRESHOLD - LOSS_THRESHOLD_VELOCITY*epoch
+    else:
+        all_losses = np.zeros(len(sample_losses))
+        for i, idx in enumerate(sample_losses):
+            all_losses[i] = np.mean(sample_losses[idx])
+        threshold = np.quantile(all_losses, 1-FORCE_PROPORTION)
     keep_idx = set()
     for idx in sample_losses:
-        if np.mean(sample_losses[idx]) > (LOSS_THRESHOLD - LOSS_THRESHOLD_VELOCITY*epoch) or np.random.random() < REINTRODUCE_LEARNED:
+        if np.mean(sample_losses[idx]) > threshold or np.random.random() < REINTRODUCE_LEARNED:
             keep_idx.add(idx)
     subset = Subset(dataset, list(keep_idx))
     proportion = len(keep_idx)/(len(train_loader)*batch_size)
@@ -52,6 +60,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
     times = []
     proportions = []
     start_time = time.time()
+    load_time = 0
     for epoch in range(epochs):
         model.to(device)
         model.train()
@@ -59,8 +68,10 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         accuracy = []
         epoch_losses = []
         if use_curriculum and epoch >= STORED_LOSSES:
+            start_load = time.time()
             training, proportion = load_curriculum(
                 train_loader, sample_losses, epoch)
+            load_time += time.time() - start_load
             proportions.append(proportion)
         else:
             proportions.append(1)
@@ -91,6 +102,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         else:
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)
+        print(f"Load time: {load_time} s")
     if val_loader is not None:
         return {
             'loss': losses, 'acc': accuracies, 'val_loss': val_losses, 'val_acc': val_accuracies,
