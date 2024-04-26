@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from cifar10 import Cifar10Model, get_cifar10_data
+from mnist import MNISTModel, get_mnist_data
 from torch.utils.data import DataLoader, Subset
 
 parser = argparse.ArgumentParser()
@@ -17,7 +18,7 @@ args = parser.parse_args()
 
 EPOCHS = int(args.epochs) if args.epochs is not None else 10
 device = args.device or "cpu"
-USE_CURRICULUM = True
+USE_CURRICULUM = False
 LOSS_THRESHOLD = 0.9
 LOSS_THRESHOLD_VELOCITY = 0
 FORCE_PROPORTION = 0.7
@@ -128,9 +129,9 @@ def test(model, test_loader):
 
 
 def main():
-    train_loader, test_loader = get_cifar10_data()
+    train_loader, test_loader = get_mnist_data()
 
-    model = Cifar10Model()
+    model = MNISTModel()
     train_res = train(model, train_loader,
                       val_loader=test_loader, epochs=EPOCHS)
     train_loss, train_acc, val_loss, val_acc, train_times, proportions = (train_res['loss'],

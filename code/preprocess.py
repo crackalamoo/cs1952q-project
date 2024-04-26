@@ -27,15 +27,17 @@ def pickle_mnist():
     transform = transforms.Compose(
     [transforms.ToTensor(),
      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
+    trainset = torchvision.datasets.MNIST(root='./data', train=True,
                                         download=True, transform=transform)
-    trainset = {'data': trainset.data, 'labels': trainset.targets}
+    trainset.data = trainset.data.tolist()
+    trainset = {b'data': trainset.data, b'labels': trainset.targets}
     with open('../data/mnist_train', 'wb') as fo:
         pickle.dump(trainset, fo)
     
-    testset = torchvision.datasets.CIFAR10(root='./data', train=True,
+    testset = torchvision.datasets.MNIST(root='./data', train=True,
                                         download=True, transform=transform)
-    testset = {'data': testset.data, 'labels': testset.targets}
+    testset.data = testset.data.tolist()
+    testset = {b'data': testset.data, b'labels': testset.targets}
     with open('../data/mnist_test', 'wb') as fo:
         pickle.dump(testset, fo)
     

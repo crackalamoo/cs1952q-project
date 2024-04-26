@@ -166,3 +166,4 @@ visualized_images/*
 results/*
 models/*
 code/.DS_Store
+code/data/*
