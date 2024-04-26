@@ -34,7 +34,7 @@ class MNISTModel(torch.nn.Module):
         self.pool_fns = [pool_fn1]
         # self.batch_fns = [self.batch_norm1]
         # self.dropout = torch.nn.Dropout(self.dropout_rate)
-        self.linear = torch.nn.Linear(20*7*7, self.hidden_layer1)
+        self.linear = torch.nn.Linear(16*6*6, self.hidden_layer1)
         self.hidden1 = torch.nn.Linear(self.hidden_layer1, self.hidden_layer1)
         self.hidden2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
         self.linears = [self.linear, self.hidden2]

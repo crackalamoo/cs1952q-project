@@ -12,13 +12,13 @@ from mnist import MNISTModel, get_mnist_data
 from torch.utils.data import DataLoader, Subset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--device")
-parser.add_argument("--epochs")
+parser.add_argument("--device", default="cpu")
+parser.add_argument("--epochs", type=int, default=10)
 args = parser.parse_args()
 
-EPOCHS = int(args.epochs) if args.epochs is not None else 10
-device = args.device or "cpu"
-USE_CURRICULUM = False
+EPOCHS = args.epochs
+device = args.device
+USE_CURRICULUM = True
 LOSS_THRESHOLD = 0.9
 LOSS_THRESHOLD_VELOCITY = 0
 FORCE_PROPORTION = 0.7
