@@ -3,6 +3,9 @@ import pickle
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset, DataLoader
+import torchvision
+from torchvision import transforms
+import shutil
 
 
 def unpickle(file):
@@ -20,8 +23,25 @@ def unpickle(file):
         dict = pickle.load(fo, encoding='bytes')
     return dict
 
+def pickle_mnist():
+    transform = transforms.Compose(
+    [transforms.ToTensor(),
+     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                        download=True, transform=transform)
+    trainset = {'data': trainset.data, 'labels': trainset.targets}
+    with open('../data/mnist_train', 'wb') as fo:
+        pickle.dump(trainset, fo)
+    
+    testset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                        download=True, transform=transform)
+    testset = {'data': testset.data, 'labels': testset.targets}
+    with open('../data/mnist_test', 'wb') as fo:
+        pickle.dump(testset, fo)
+    
+    shutil.rmtree('./data')
 
-def get_image_classifier_data(file_path, classes=None, batch_size=64, shuffle=True):
+def get_image_classifier_data(file_path, classes=None, num_channels=3, image_size=32, batch_size=64, shuffle=True):
     """
     Given a file path and two target classes, returns an array of 
     normalized inputs (images) and an array of labels. 
@@ -64,7 +84,7 @@ def get_image_classifier_data(file_path, classes=None, batch_size=64, shuffle=Tr
     idxs = torch.arange(0, inputs.size(0))
 
     # Reshape and transpose images to match PyTorch's convention (num_inputs, num_channels, width, height)
-    inputs = inputs.view(-1, 3, 32, 32)
+    inputs = inputs.view(-1, num_channels, image_size, image_size)
 
     # Normalize inputs
     inputs /= 255.0
@@ -73,3 +93,6 @@ def get_image_classifier_data(file_path, classes=None, batch_size=64, shuffle=Tr
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     return data_loader
+
+if __name__ == '__main__':
+    pickle_mnist()
