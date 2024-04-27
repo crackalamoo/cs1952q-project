@@ -25,8 +25,7 @@ FORCE_PROPORTION = 0.35
 REINTRODUCE_LEARNED = 0.2
 STORED_LOSSES = 1
 LR = 1e-3
-
-torch.manual_seed(42)
+RUNS = 2
 
 
 def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
@@ -130,7 +129,7 @@ def test(model, test_loader):
     return test_loss, test_acc
 
 
-def main():
+def do_run(run_no=0):
     train_loader, test_loader = get_mnist_data()
 
     model = MNISTModel()
@@ -145,65 +144,78 @@ def main():
     print(f"Final Test Accuracy: {test_acc}")
     print(f"Total time: {train_times[-1]} s")
 
-    # plt.figure()
-    # plt.plot(train_times, train_loss, label='training loss')
-    # plt.plot(train_times, val_loss, label='validation loss')
-    # plt.legend()
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Cross-entropy loss')
-    # if USE_CURRICULUM:
-    #     plt.savefig('../results/cur_train_val.png')
-    # else:
-    #     plt.savefig('../results/reg_train_val.png')
-
-    # plt.figure()
-    # plt.plot(train_times, train_acc, label='train accuracy')
-    # plt.plot(train_times, val_acc, label='validation accuracy')
-    # plt.plot(train_times[STORED_LOSSES:],
-    #          proportions[STORED_LOSSES:], label='proportion')
-    # plt.xlabel("Time (s)")
-    # plt.ylabel("Accuracy/proportion")
-    # plt.title("Accuracy and training proportion over time")
-    # plt.legend()
-    # if USE_CURRICULUM:
-    #     plt.savefig('../results/cur_acc.png')
-    # else:
-    #     plt.savefig('../results/reg_acc.png')
-
     fname = 'cur' if USE_CURRICULUM else 'reg'
-    with open(f'../results/{fname}.npy', 'wb') as f:
+    with open(f'../results/{fname}.npy', 'ab+') as f:
         np.save(f, train_times)
         np.save(f, val_loss)
         np.save(f, val_acc)
+    
 
-    if USE_CURRICULUM:
-        try:
-            with open(f'../results/reg.npy', 'rb') as f:
-                reg_times = np.load(f)
-                reg_loss = np.load(f)
-                reg_acc = np.load(f)
-            plt.figure()
-            plt.plot(train_times, val_acc, label='curriculum')
-            plt.plot(reg_times, reg_acc, label='no curriculum')
-            # plt.plot(train_times[STORED_LOSSES:],
-            #          proportions[STORED_LOSSES:], label='proportion')
-            plt.xlabel('Time (s)')
-            plt.ylabel('Accuracy/proportion')
-            plt.legend()
-            plt.savefig('../results/cur_vs_reg.png')
+def do_graph():
+    try:
+        def get_stats(fname):
+            total_times = []
+            total_loss = []
+            total_acc = []
+            with open(f'../results/{fname}.npy', 'rb') as f:
+                for i in range(RUNS):
+                    reg_times = np.load(f)
+                    reg_loss = np.load(f)
+                    reg_acc = np.load(f)
+                    total_times.append(reg_times)
+                    total_loss.append(reg_loss)
+                    total_acc.append(reg_acc)
+            new_times = np.linspace(np.min(total_times), np.max(total_times), 1000)
+            def get_extrapolated_values(times, values):
+                new_values = np.interp(new_times, times, values)
+                return new_values
+            total_loss = [get_extrapolated_values(reg_times, reg_loss) for reg_times,reg_loss in zip(total_times, total_loss)]
+            total_acc = [get_extrapolated_values(reg_times, reg_acc) for reg_times,reg_acc in zip(total_times, total_acc)]
+            total_loss = np.array(total_loss)
+            total_acc = np.array(total_acc)
+            mean_loss = np.mean(total_loss, axis=0)
+            mean_acc = np.mean(total_acc, axis=0)
+            stderr_loss = np.std(total_loss, axis=0, ddof=1)/np.sqrt(total_loss.shape[0])
+            stderr_acc = np.std(total_acc, axis=0, ddof=1)/np.sqrt(total_acc.shape[0])
+            return new_times, mean_loss, mean_acc, stderr_loss, stderr_acc
+        
+        reg_times, reg_loss, reg_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
+        if USE_CURRICULUM:
+            cur_times, cur_loss, cur_acc, cur_stderr_loss, cur_stderr_acc = get_stats('cur')
 
-            plt.figure()
-            plt.plot(train_times, val_loss, label='curriculum')
-            plt.plot(reg_times, reg_loss, label='no curriculum')
-            plt.xlabel('Time (s)')
-            plt.ylabel('Cross-entropy loss')
-            plt.legend()
-            plt.savefig('../results/cur_vs_reg_loss.png')
-        except FileNotFoundError:
-            pass
 
-    plt.show()
+        plt.figure()
+        if USE_CURRICULUM:
+            plt.plot(cur_times, cur_acc, label='curriculum')
+            plt.fill_between(cur_times, cur_acc-cur_stderr_acc, cur_acc+cur_stderr_acc, alpha=0.3)
+        plt.plot(reg_times, reg_acc, label='no curriculum')
+        plt.fill_between(reg_times, reg_acc-reg_stderr_acc, reg_acc+reg_stderr_acc, alpha=0.3)
+        # plt.plot(cur_times[STORED_LOSSES:],
+        #          proportions[STORED_LOSSES:], label='proportion')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Accuracy/proportion')
+        plt.legend()
+        plt.savefig('../results/cur_vs_reg.png')
 
+        plt.figure()
+        if USE_CURRICULUM:
+            plt.plot(cur_times, cur_loss, label='curriculum')
+            plt.fill_between(cur_times, cur_loss-cur_stderr_loss, cur_loss+cur_stderr_loss, alpha=0.3)
+        plt.plot(reg_times, reg_loss, label='no curriculum')
+        plt.fill_between(reg_times, reg_loss-reg_stderr_loss, reg_loss+reg_stderr_loss, alpha=0.3)
+        plt.xlabel('Time (s)')
+        plt.ylabel('Cross-entropy loss')
+        plt.legend()
+        plt.savefig('../results/cur_vs_reg_loss.png')
+        plt.show()
+    except FileNotFoundError:
+        pass
+
+def main():
+    for i in range(RUNS):
+        torch.manual_seed(42+i)
+        do_run(i)
+    do_graph()
 
 if __name__ == '__main__':
     main()
