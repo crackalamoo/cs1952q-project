@@ -21,10 +21,12 @@ device = args.device
 USE_CURRICULUM = True
 LOSS_THRESHOLD = 0.9
 LOSS_THRESHOLD_VELOCITY = 0
-FORCE_PROPORTION = 0.7
-REINTRODUCE_LEARNED = 0.4
-STORED_LOSSES = 3
+FORCE_PROPORTION = 0.35
+REINTRODUCE_LEARNED = 0.2
+STORED_LOSSES = 1
 LR = 1e-3
+
+torch.manual_seed(42)
 
 
 def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
@@ -143,34 +145,30 @@ def main():
     print(f"Final Test Accuracy: {test_acc}")
     print(f"Total time: {train_times[-1]} s")
 
-    plt.figure()
-    if USE_CURRICULUM:
-        plt.title('Dynamic curriculum learning avoids overfitting on CIFAR-10')
-    else:
-        plt.title('Model performance without dynamic curriculum')
-    plt.plot(train_times, train_loss, label='training loss')
-    plt.plot(train_times, val_loss, label='validation loss')
-    plt.legend()
-    plt.xlabel('Time (s)')
-    plt.ylabel('Cross-entropy loss')
-    if USE_CURRICULUM:
-        plt.savefig('../results/cur_train_val.png')
-    else:
-        plt.savefig('../results/reg_train_val.png')
+    # plt.figure()
+    # plt.plot(train_times, train_loss, label='training loss')
+    # plt.plot(train_times, val_loss, label='validation loss')
+    # plt.legend()
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Cross-entropy loss')
+    # if USE_CURRICULUM:
+    #     plt.savefig('../results/cur_train_val.png')
+    # else:
+    #     plt.savefig('../results/reg_train_val.png')
 
-    plt.figure()
-    plt.plot(train_times, train_acc, label='train accuracy')
-    plt.plot(train_times, val_acc, label='validation accuracy')
-    plt.plot(train_times[STORED_LOSSES:],
-             proportions[STORED_LOSSES:], label='proportion')
-    plt.xlabel("Time (s)")
-    plt.ylabel("Accuracy/proportion")
-    plt.title("Accuracy and training proportion over time")
-    plt.legend()
-    if USE_CURRICULUM:
-        plt.savefig('../results/cur_acc.png')
-    else:
-        plt.savefig('../results/reg_acc.png')
+    # plt.figure()
+    # plt.plot(train_times, train_acc, label='train accuracy')
+    # plt.plot(train_times, val_acc, label='validation accuracy')
+    # plt.plot(train_times[STORED_LOSSES:],
+    #          proportions[STORED_LOSSES:], label='proportion')
+    # plt.xlabel("Time (s)")
+    # plt.ylabel("Accuracy/proportion")
+    # plt.title("Accuracy and training proportion over time")
+    # plt.legend()
+    # if USE_CURRICULUM:
+    #     plt.savefig('../results/cur_acc.png')
+    # else:
+    #     plt.savefig('../results/reg_acc.png')
 
     fname = 'cur' if USE_CURRICULUM else 'reg'
     with open(f'../results/{fname}.npy', 'wb') as f:
@@ -187,11 +185,10 @@ def main():
             plt.figure()
             plt.plot(train_times, val_acc, label='curriculum')
             plt.plot(reg_times, reg_acc, label='no curriculum')
-            plt.plot(train_times[STORED_LOSSES:],
-                     proportions[STORED_LOSSES:], label='proportion')
+            # plt.plot(train_times[STORED_LOSSES:],
+            #          proportions[STORED_LOSSES:], label='proportion')
             plt.xlabel('Time (s)')
             plt.ylabel('Accuracy/proportion')
-            plt.title('Faster convergence and comparable performance on CIFAR-10')
             plt.legend()
             plt.savefig('../results/cur_vs_reg.png')
 
@@ -200,7 +197,6 @@ def main():
             plt.plot(reg_times, reg_loss, label='no curriculum')
             plt.xlabel('Time (s)')
             plt.ylabel('Cross-entropy loss')
-            plt.title('Faster convergence and comparable performance on CIFAR-10')
             plt.legend()
             plt.savefig('../results/cur_vs_reg_loss.png')
         except FileNotFoundError:
