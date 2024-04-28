@@ -22,7 +22,7 @@ LR = 1e-3
 USE_CURRICULUM = True
 RUNS = 3
 
-PROPORTION = 0.40
+PROPORTION = 0.20
 START_EPOCH = 1
 
 
@@ -36,8 +36,8 @@ def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
     mean_losses = np.array([np.mean(losses)
                            for losses in sample_losses.values()])
 
-    lower_bound = np.percentile(mean_losses, lower_quantile)
-    upper_bound = np.percentile(mean_losses, lower_quantile + PROPORTION)
+    lower_bound = np.quantile(mean_losses, lower_quantile)
+    upper_bound = np.quantile(mean_losses, lower_quantile + PROPORTION)
 
     keep_idx = [idx for idx, losses in enumerate(sample_losses.values())
                 if lower_bound <= np.mean(losses) <= upper_bound]
