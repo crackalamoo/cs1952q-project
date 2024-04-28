@@ -18,14 +18,12 @@ args = parser.parse_args()
 
 EPOCHS = args.epochs
 device = args.device
-USE_CURRICULUM = True
-LOSS_THRESHOLD = 0.9
-LOSS_THRESHOLD_VELOCITY = 0
-FORCE_PROPORTION = 0.35
-REINTRODUCE_LEARNED = 0.2
-STORED_LOSSES = 1
 LR = 1e-3
-RUNS = 2
+USE_CURRICULUM = True
+RUNS = 5
+
+PROPORTION = 0.20
+START_EPOCH = 1
 
 
 def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
@@ -33,18 +31,18 @@ def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
         batch_size = train_loader.batch_size
 
     dataset = train_loader.dataset
-    if FORCE_PROPORTION is None:
-        threshold = LOSS_THRESHOLD - LOSS_THRESHOLD_VELOCITY*epoch
-    else:
-        all_losses = np.zeros(len(sample_losses))
-        for i, idx in enumerate(sample_losses):
-            all_losses[i] = np.mean(sample_losses[idx])
-        threshold = np.quantile(all_losses, 1-FORCE_PROPORTION)
-    keep_idx = set()
-    for idx in sample_losses:
-        if np.mean(sample_losses[idx]) > threshold or np.random.random() < REINTRODUCE_LEARNED:
-            keep_idx.add(idx)
-    subset = Subset(dataset, list(keep_idx))
+
+    lower_quantile = (1 - PROPORTION) * epoch / (EPOCHS - START_EPOCH)
+    mean_losses = np.array([np.mean(losses)
+                           for losses in sample_losses.values()])
+
+    lower_bound = np.percentile(mean_losses, lower_quantile)
+    upper_bound = np.percentile(mean_losses, lower_quantile + PROPORTION)
+
+    keep_idx = [idx for idx, losses in enumerate(sample_losses.values())
+                if lower_bound <= np.mean(losses) <= upper_bound]
+
+    subset = Subset(dataset, keep_idx)
     proportion = len(keep_idx)/(len(train_loader)*batch_size)
     print("Proportion kept:", proportion)
 
@@ -58,7 +56,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
     val_losses = []
     val_accuracies = []
     training = train_loader
-    sample_losses = defaultdict(lambda: 900*np.ones(STORED_LOSSES))
+    sample_losses = defaultdict(lambda: 900*np.ones(START_EPOCH))
     times = []
     proportions = []
     start_time = time.time()
@@ -69,7 +67,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         accuracy = []
         epoch_losses = []
-        if use_curriculum and epoch >= STORED_LOSSES:
+        if use_curriculum and epoch >= START_EPOCH:
             start_load = time.time()
             training, proportion = load_curriculum(
                 train_loader, sample_losses, epoch)
@@ -149,7 +147,7 @@ def do_run(run_no=0):
         np.save(f, train_times)
         np.save(f, val_loss)
         np.save(f, val_acc)
-    
+
 
 def do_graph():
     try:
@@ -165,31 +163,40 @@ def do_graph():
                     total_times.append(reg_times)
                     total_loss.append(reg_loss)
                     total_acc.append(reg_acc)
-            new_times = np.linspace(np.min(total_times), np.max(total_times), 1000)
+            new_times = np.linspace(
+                np.min(total_times), np.max(total_times), 1000)
+
             def get_extrapolated_values(times, values):
                 new_values = np.interp(new_times, times, values)
                 return new_values
-            total_loss = [get_extrapolated_values(reg_times, reg_loss) for reg_times,reg_loss in zip(total_times, total_loss)]
-            total_acc = [get_extrapolated_values(reg_times, reg_acc) for reg_times,reg_acc in zip(total_times, total_acc)]
+            total_loss = [get_extrapolated_values(
+                reg_times, reg_loss) for reg_times, reg_loss in zip(total_times, total_loss)]
+            total_acc = [get_extrapolated_values(
+                reg_times, reg_acc) for reg_times, reg_acc in zip(total_times, total_acc)]
             total_loss = np.array(total_loss)
             total_acc = np.array(total_acc)
             mean_loss = np.mean(total_loss, axis=0)
             mean_acc = np.mean(total_acc, axis=0)
-            stderr_loss = np.std(total_loss, axis=0, ddof=1)/np.sqrt(total_loss.shape[0])
-            stderr_acc = np.std(total_acc, axis=0, ddof=1)/np.sqrt(total_acc.shape[0])
+            stderr_loss = np.std(total_loss, axis=0, ddof=1) / \
+                np.sqrt(total_loss.shape[0])
+            stderr_acc = np.std(total_acc, axis=0, ddof=1) / \
+                np.sqrt(total_acc.shape[0])
             return new_times, mean_loss, mean_acc, stderr_loss, stderr_acc
-        
-        reg_times, reg_loss, reg_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
-        if USE_CURRICULUM:
-            cur_times, cur_loss, cur_acc, cur_stderr_loss, cur_stderr_acc = get_stats('cur')
 
+        reg_times, reg_loss, reg_acc, reg_stderr_loss, reg_stderr_acc = get_stats(
+            'reg')
+        if USE_CURRICULUM:
+            cur_times, cur_loss, cur_acc, cur_stderr_loss, cur_stderr_acc = get_stats(
+                'cur')
 
         plt.figure()
         if USE_CURRICULUM:
             plt.plot(cur_times, cur_acc, label='curriculum')
-            plt.fill_between(cur_times, cur_acc-cur_stderr_acc, cur_acc+cur_stderr_acc, alpha=0.3)
+            plt.fill_between(cur_times, cur_acc-cur_stderr_acc,
+                             cur_acc+cur_stderr_acc, alpha=0.3)
         plt.plot(reg_times, reg_acc, label='no curriculum')
-        plt.fill_between(reg_times, reg_acc-reg_stderr_acc, reg_acc+reg_stderr_acc, alpha=0.3)
+        plt.fill_between(reg_times, reg_acc-reg_stderr_acc,
+                         reg_acc+reg_stderr_acc, alpha=0.3)
         # plt.plot(cur_times[STORED_LOSSES:],
         #          proportions[STORED_LOSSES:], label='proportion')
         plt.xlabel('Time (s)')
@@ -200,9 +207,11 @@ def do_graph():
         plt.figure()
         if USE_CURRICULUM:
             plt.plot(cur_times, cur_loss, label='curriculum')
-            plt.fill_between(cur_times, cur_loss-cur_stderr_loss, cur_loss+cur_stderr_loss, alpha=0.3)
+            plt.fill_between(cur_times, cur_loss-cur_stderr_loss,
+                             cur_loss+cur_stderr_loss, alpha=0.3)
         plt.plot(reg_times, reg_loss, label='no curriculum')
-        plt.fill_between(reg_times, reg_loss-reg_stderr_loss, reg_loss+reg_stderr_loss, alpha=0.3)
+        plt.fill_between(reg_times, reg_loss-reg_stderr_loss,
+                         reg_loss+reg_stderr_loss, alpha=0.3)
         plt.xlabel('Time (s)')
         plt.ylabel('Cross-entropy loss')
         plt.legend()
@@ -211,11 +220,13 @@ def do_graph():
     except FileNotFoundError:
         pass
 
+
 def main():
     for i in range(RUNS):
         torch.manual_seed(42+i)
         do_run(i)
     do_graph()
+
 
 if __name__ == '__main__':
     main()
