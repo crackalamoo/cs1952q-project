@@ -20,9 +20,9 @@ EPOCHS = args.epochs
 device = args.device
 LR = 1e-3
 USE_CURRICULUM = True
-RUNS = 5
+RUNS = 3
 
-PROPORTION = 0.20
+PROPORTION = 0.40
 START_EPOCH = 1
 
 
@@ -143,7 +143,7 @@ def do_run(run_no=0):
     print(f"Total time: {train_times[-1]} s")
 
     fname = 'cur' if USE_CURRICULUM else 'reg'
-    with open(f'../results/{fname}.npy', 'ab+') as f:
+    with open(f'../results/{fname}.npy', 'wb+' if run_no == 0 else 'ab+') as f:
         np.save(f, train_times)
         np.save(f, val_loss)
         np.save(f, val_acc)
