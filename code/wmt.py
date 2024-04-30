@@ -30,7 +30,7 @@ class TokenEmbedding(torch.nn.Module):
         self.emb_size = emb_size
 
     def forward(self, tokens: torch.Tensor):
-        return self.embedding(tokens.long()) * torch.sqrt(self.emb_size)
+        return self.embedding(tokens.long()) * np.sqrt(self.emb_size)
 
 class WMTModel(torch.nn.Module):
     def __init__(self,
@@ -49,8 +49,8 @@ class WMTModel(torch.nn.Module):
                                        dim_feedforward=dim_feedforward,
                                        dropout=dropout)
         self.generator = torch.nn.Linear(emb_size, vocab_size)
-        self.src_tok_emb = TokenEmbedding(vocab_size, emb_size)
-        self.tgt_tok_emb = TokenEmbedding(vocab_size, emb_size)
+        self.src_tok_emb = TokenEmbedding(vocab_size+2, emb_size)
+        self.tgt_tok_emb = TokenEmbedding(vocab_size+2, emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
 
@@ -59,11 +59,11 @@ class WMTModel(torch.nn.Module):
         tgt_input = tgt[:-1, :] # exclude last word, which must be predicted
         src_padding_mask = pad_mask(src)
         tgt_padding_mask = pad_mask(tgt_input)
-        tgt_mask = torch.ones(tgt.size()[0])
+        tgt_mask = torch.ones(tgt_input.size()[0], tgt_input.size()[0])
         tgt_mask = torch.triu(tgt_mask, diagonal=1).bool()
 
         src_emb = self.positional_encoding(self.src_tok_emb(src))
-        tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt))
+        tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt_input))
         outs = self.transformer(src_emb, tgt_emb, tgt_mask=tgt_mask,
                                 src_key_padding_mask=src_padding_mask,
                                 tgt_key_padding_mask=tgt_padding_mask)

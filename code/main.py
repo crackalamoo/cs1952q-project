@@ -54,7 +54,7 @@ def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
     return training, proportion
 
 
-def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=USE_CURRICULUM, lr=LR):
+def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=USE_CURRICULUM, lr=LR, use_labels_as_input=False):
     losses = []
     accuracies = []
     val_losses = []
@@ -82,7 +82,12 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         for inputs, labels, idxs in training:
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = model(inputs)
+            
+            if use_labels_as_input:
+                outputs = model(inputs, labels)
+            else:
+                outputs = model(inputs)
+            
             batch_losses = torch.nn.functional.cross_entropy(
                 outputs, labels.float(), reduction='none')
             for idx, loss_i in zip(idxs, batch_losses):
@@ -131,12 +136,12 @@ def test(model, test_loader):
     return test_loss, test_acc
 
 
-def do_run(ModelClass, get_data, run_no=0):
+def do_run(ModelClass, get_data, run_no=0, use_labels_as_input=False):
     train_loader, test_loader, extras = get_data()
 
     model = ModelClass()
-    train_res = train(model, train_loader,
-                      val_loader=test_loader, epochs=EPOCHS)
+    train_res = train(model, train_loader, val_loader=test_loader,
+                      use_labels_as_input=use_labels_as_input, epochs=EPOCHS)
     train_loss, train_acc, val_loss, val_acc, train_times, proportions = (train_res['loss'],
                                                                           train_res['acc'], train_res['val_loss'], train_res['val_acc'],
                                                                           train_res['times'], train_res['prop'])
@@ -216,7 +221,7 @@ def do_graph():
 def main():
     for i in range(RUNS):
         torch.manual_seed(42+i)
-        do_run(WMTModel, get_wmt_data, i)
+        do_run(WMTModel, get_wmt_data, i, use_labels_as_input=True)
     do_graph()
 
 if __name__ == '__main__':
