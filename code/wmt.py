@@ -54,19 +54,21 @@ class WMTModel(torch.nn.Module):
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
 
-    def forward(self,
-                src: torch.Tensor,
-                trg: torch.Tensor,
-                src_mask: torch.Tensor,
-                tgt_mask: torch.Tensor,
-                src_padding_mask: torch.Tensor,
-                tgt_padding_mask: torch.Tensor,
-                memory_key_padding_mask: torch.Tensor):
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor):
+        pad_mask = lambda t: (t == 0).transpose(0, 1)
+        tgt_input = tgt[:-1, :]
+        src_padding_mask = pad_mask(src)
+        tgt_padding_mask = pad_mask(tgt_input)
+        tgt_mask = torch.ones(tgt.size()[0])
+        tgt_mask = torch.triu(tgt_mask, diagonal=1).bool()
+
         src_emb = self.positional_encoding(self.src_tok_emb(src))
-        tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg))
-        outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None,
-                                src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
-        return self.generator(outs)
+        tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt))
+        outs = self.transformer(src_emb, tgt_emb, tgt_mask=tgt_mask,
+                                src_key_padding_mask=src_padding_mask,
+                                tgt_key_padding_mask=tgt_padding_mask)
+        logits = self.generator(outs)
+        return logits
 
     def encode(self, src: torch.Tensor, src_mask: torch.Tensor):
         return self.transformer.encoder(self.positional_encoding(
