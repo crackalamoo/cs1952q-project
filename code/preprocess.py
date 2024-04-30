@@ -186,7 +186,6 @@ def get_language_model_data(file_path, batch_size=64, shuffle=True):
     unpickled_file = unpickle(file_path)
     inputs = unpickled_file[b'data']
     labels = unpickled_file[b'labels']
-    idxs = torch.arange(0, len(inputs))
 
     def collate_batch(batch_data):
         in_batch, out_batch = [], []
@@ -201,7 +200,7 @@ def get_language_model_data(file_path, batch_size=64, shuffle=True):
     dataset = list(zip(inputs, labels))
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
 
-    return data_loader
+    return data_loader, unpickled_file[b'data_tok'], unpickled_file[b'labels_tok']
 
 if __name__ == '__main__':
     if args.dataset == 'mnist':
