@@ -104,4 +104,4 @@ def get_mnist_data():
     train_loader = get_mnist(AUTOGRADER_TRAIN_FILE)
     test_loader = get_mnist(AUTOGRADER_TEST_FILE)
 
-    return train_loader, test_loader
+    return train_loader, test_loader, None

@@ -9,12 +9,14 @@ import numpy as np
 import torch
 from cifar10 import Cifar10Model, get_cifar10_data
 from mnist import MNISTModel, get_mnist_data
+from wmt import WMTModel, get_wmt_data
 from torch.utils.data import DataLoader, Subset
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--device", default="cpu")
-parser.add_argument("--epochs", type=int, default=10)
-args = parser.parse_args()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--epochs", type=int, default=10)
+    args = parser.parse_args()
 
 EPOCHS = args.epochs
 device = args.device
@@ -129,10 +131,10 @@ def test(model, test_loader):
     return test_loss, test_acc
 
 
-def do_run(run_no=0):
-    train_loader, test_loader = get_mnist_data()
+def do_run(ModelClass, get_data, run_no=0):
+    train_loader, test_loader, extras = get_data()
 
-    model = MNISTModel()
+    model = ModelClass()
     train_res = train(model, train_loader,
                       val_loader=test_loader, epochs=EPOCHS)
     train_loss, train_acc, val_loss, val_acc, train_times, proportions = (train_res['loss'],
@@ -145,7 +147,7 @@ def do_run(run_no=0):
     print(f"Total time: {train_times[-1]} s")
 
     fname = 'cur' if USE_CURRICULUM else 'reg'
-    with open(f'../results/{fname}.npy', 'ab+') as f:
+    with open(f'../results/{fname}.npy', 'wb+' if run_no == 0 else 'ab+') as f:
         np.save(f, train_times)
         np.save(f, val_loss)
         np.save(f, val_acc)
@@ -214,7 +216,7 @@ def do_graph():
 def main():
     for i in range(RUNS):
         torch.manual_seed(42+i)
-        do_run(i)
+        do_run(WMTModel, get_wmt_data, i)
     do_graph()
 
 if __name__ == '__main__':

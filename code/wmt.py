@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from preprocess import get_language_model_data
 
 # https://pytorch.org/tutorials/beginner/translation_transformer.html#seq2seq-network-using-transformer
@@ -9,7 +10,7 @@ class PositionalEncoding(torch.nn.Module):
                  dropout: float,
                  maxlen: int = 5000):
         super(PositionalEncoding, self).__init__()
-        den = torch.exp(- torch.arange(0, emb_size, 2)* torch.log(10000) / emb_size)
+        den = torch.exp(-torch.arange(0, emb_size, 2) * np.log(10000) / emb_size)
         pos = torch.arange(0, maxlen).reshape(maxlen, 1)
         pos_embedding = torch.zeros((maxlen, emb_size))
         pos_embedding[:, 0::2] = torch.sin(pos * den)
@@ -33,12 +34,11 @@ class TokenEmbedding(torch.nn.Module):
 
 class WMTModel(torch.nn.Module):
     def __init__(self,
-                 num_encoder_layers: int,
-                 num_decoder_layers: int,
-                 emb_size: int,
-                 nhead: int,
-                 src_vocab_size: int,
-                 tgt_vocab_size: int,
+                 num_encoder_layers: int = 2,
+                 num_decoder_layers: int = 2,
+                 emb_size: int = 512,
+                 nhead: int = 2,
+                 vocab_size: int = 512,
                  dim_feedforward: int = 512,
                  dropout: float = 0.1):
         super(WMTModel, self).__init__()
@@ -48,15 +48,15 @@ class WMTModel(torch.nn.Module):
                                        num_decoder_layers=num_decoder_layers,
                                        dim_feedforward=dim_feedforward,
                                        dropout=dropout)
-        self.generator = torch.nn.Linear(emb_size, tgt_vocab_size)
-        self.src_tok_emb = TokenEmbedding(src_vocab_size, emb_size)
-        self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, emb_size)
+        self.generator = torch.nn.Linear(emb_size, vocab_size)
+        self.src_tok_emb = TokenEmbedding(vocab_size, emb_size)
+        self.tgt_tok_emb = TokenEmbedding(vocab_size, emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor):
         pad_mask = lambda t: (t == 0).transpose(0, 1)
-        tgt_input = tgt[:-1, :]
+        tgt_input = tgt[:-1, :] # exclude last word, which must be predicted
         src_padding_mask = pad_mask(src)
         tgt_padding_mask = pad_mask(tgt_input)
         tgt_mask = torch.ones(tgt.size()[0])
@@ -68,7 +68,6 @@ class WMTModel(torch.nn.Module):
                                 src_key_padding_mask=src_padding_mask,
                                 tgt_key_padding_mask=tgt_padding_mask)
         logits = self.generator(outs)
-        logits = logits[1:, :]
         return logits
 
     def encode(self, src: torch.Tensor, src_mask: torch.Tensor):
@@ -82,7 +81,7 @@ class WMTModel(torch.nn.Module):
     
     def loss(self, logits, labels):
         loss_fn = torch.nn.CrossEntropyLoss()
-        return loss_fn(logits.view(-1, logits.size(-1)), labels.view(-1))
+        return loss_fn(logits.view(-1, logits.size(-1)), labels[1:, :].view(-1))
     
     def accuracy(self, logits, labels):
         predicted = torch.argmax(logits, dim=-1)
@@ -95,7 +94,7 @@ def get_wmt_data():
     AUTOGRADER_TRAIN_FILE = '../data/wmt_train'
     AUTOGRADER_TEST_FILE = '../data/wmt_test'
 
-    train_loader, data_tok, labels_tok = get_language_model_data(AUTOGRADER_TRAIN_FILE)
-    test_loader, _, _ = get_language_model_data(AUTOGRADER_TEST_FILE)
+    train_loader, data_tok, labels_tok = get_language_model_data(AUTOGRADER_TRAIN_FILE, include_tok=True)
+    test_loader = get_language_model_data(AUTOGRADER_TEST_FILE)
 
-    return train_loader, test_loader, data_tok, labels_tok
+    return train_loader, test_loader, {'data_tok': data_tok, 'labels_tok': labels_tok}

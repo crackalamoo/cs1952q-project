@@ -10,11 +10,12 @@ import spacy
 import shutil
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--dataset")
-parser.add_argument("--vocab_size", default=512, type=int)
-args = parser.parse_args()
-vocab_size = args.vocab_size
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset")
+    parser.add_argument("--vocab_size", default=512, type=int)
+    args = parser.parse_args()
+    vocab_size = args.vocab_size
 
 
 def unpickle(file):
@@ -178,7 +179,7 @@ def pickle_wmt(num_train_samples=3000):
     with open('../data/wmt_test', 'wb') as fo:
         pickle.dump(testset, fo)
 
-def get_language_model_data(file_path, batch_size=64, shuffle=True):
+def get_language_model_data(file_path, batch_size=64, shuffle=True, include_tok=False):
     """
     Given a file path, returns an array of input sequences and an array of label sequences.
     """
@@ -186,21 +187,27 @@ def get_language_model_data(file_path, batch_size=64, shuffle=True):
     unpickled_file = unpickle(file_path)
     inputs = unpickled_file[b'data']
     labels = unpickled_file[b'labels']
+    example_idx = 0
 
     def collate_batch(batch_data):
-        in_batch, out_batch = [], []
+        nonlocal example_idx
+        in_batch, out_batch, idx_batch = [], [], []
         make_sentence = lambda x: torch.cat((torch.tensor([1]), torch.tensor(x), torch.tensor([2])))
         for (input, label) in batch_data:
             in_batch.append(make_sentence(input))
             out_batch.append(make_sentence(label))
+            idx_batch.append(example_idx)
+            example_idx += 1
         in_batch = torch.nn.utils.rnn.pad_sequence(in_batch, padding_value=0)
         out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0)
-        return in_batch, out_batch
+        return in_batch, out_batch, idx_batch
 
     dataset = list(zip(inputs, labels))
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
-
-    return data_loader, unpickled_file[b'data_tok'], unpickled_file[b'labels_tok']
+    
+    if include_tok:
+        return data_loader, unpickled_file[b'data_tok'], unpickled_file[b'labels_tok']
+    return data_loader
 
 if __name__ == '__main__':
     if args.dataset == 'mnist':
