@@ -193,8 +193,8 @@ def get_language_model_data(file_path, batch_size=64, shuffle=True):
         for (input, label) in batch_data:
             in_batch.append(make_sentence(input))
             out_batch.append(make_sentence(label))
-        in_batch = torch.nn.utils.rnn.pad_sequence(in_batch, padding_value=0, batch_first=True)
-        out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0, batch_first=True)
+        in_batch = torch.nn.utils.rnn.pad_sequence(in_batch, padding_value=0)
+        out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0)
         return in_batch, out_batch
 
     dataset = list(zip(inputs, labels))

@@ -41,18 +41,13 @@ class MNISTModel(torch.nn.Module):
 
         self.flatten = torch.nn.Flatten()
 
-    def forward(self, inputs, is_interpret=False):
+    def forward(self, inputs):
         """
         Runs a forward pass on an input batch of images.
 
-        :param inputs: images, shape of (num_inputs, 32, 32, 3); during training, the shape is (batch_size, 32, 32, 3)
-        :param is_testing: a boolean that should be set to True only when you're doing Part 2 of the assignment and this function is being called during testing
+        :param inputs: images, shape of (num_inputs, 28, 28, 1); during training, the shape is (batch_size, 28, 28, 1)
         :return: logits - a matrix of shape (num_inputs, num_classes); during training, it would be (batch_size, 2)
         """
-        # Remember that
-        # shape of input = (num_inputs (or batch_size), in_height, in_width, in_channels)
-        # shape of filter = (filter_height, filter_width, in_channels, out_channels)
-        # shape of strides = (batch_stride, height_stride, width_stride, channels_stride)
         out = inputs
         for i, conv_fn, pool_fn in zip(range(len(self.conv_fns)), self.conv_fns, self.pool_fns):
             out = conv_fn(out)
@@ -65,8 +60,6 @@ class MNISTModel(torch.nn.Module):
 
         logits = self.flatten(out)
         for i, linear in enumerate(self.linears):
-            # if i != len(self.linears)-1 and not is_interpret:  # dropout
-            #     logits = self.dropout(logits)
             logits = linear(logits)
 
         return logits
