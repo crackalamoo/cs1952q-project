@@ -12,7 +12,9 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset")
+parser.add_argument("--vocab_size", default=512, type=int)
 args = parser.parse_args()
+vocab_size = args.vocab_size
 
 
 def unpickle(file):
@@ -53,20 +55,7 @@ def pickle_mnist():
 def get_image_classifier_data(file_path, classes=None, num_channels=3, image_size=32, batch_size=64, shuffle=True):
     """
     Given a file path and two target classes, returns an array of 
-    normalized inputs (images) and an array of labels. 
-    You will want to first extract only the data that matches the 
-    corresponding classes we want (there are 10 classes and we only want 2).
-    You should make sure to normalize all inputs and also turn the labels
-    into one hot vectors using tf.one_hot().
-    Note that because you are using tf.one_hot() for your labels, your
-    labels will be a Tensor, while your inputs will be a NumPy array. This 
-    is fine because PyTorch works with NumPy arrays.
-    :param file_path: file path for inputs and labels, something 
-    like 'CIFAR_data_compressed/train'
-    :param first_class:  an integer (0-9) representing the first target
-    class in the CIFAR10 dataset, for a cat, this would be a 3
-    :param second_class:  an integer (0-9) representing the second target
-    class in the CIFAR10 dataset, for a dog, this would be a 5
+    normalized inputs (images) and an array of labels.
 
     :return: normalized NumPy array of inputs and tensor of labels, where 
     inputs are of type np.float32 and has size (num_inputs, width, height, num_channels) and labels 
@@ -103,7 +92,7 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_train_samples=3000, vocab_size=512):
+def pickle_wmt(num_train_samples=3000):
     en_tok = spacy.load('en_core_web_sm')
     fr_tok = spacy.load('fr_core_news_sm')
 
@@ -129,9 +118,18 @@ def pickle_wmt(num_train_samples=3000, vocab_size=512):
     
     en_freqs = sorted(en_freqs.items(), key=lambda x: x[1], reverse=True)
     fr_freqs = sorted(fr_freqs.items(), key=lambda x: x[1], reverse=True)
-    for i in range(vocab_size):
-        en_toks[en_freqs[i][0]] = i
-        fr_toks[fr_freqs[i][0]] = i
+    for i in range(vocab_size-3):
+        en_toks[en_freqs[i][0]] = i+3
+        fr_toks[fr_freqs[i][0]] = i+3
+    en_toks['<pad>'] = 0
+    fr_toks['<pad>'] = 0
+    en_toks['<bos>'] = 1
+    fr_toks['<bos>'] = 1
+    en_toks['<eos>'] = 2
+    fr_toks['<eos>'] = 2
+    en_toks['<unk>'] = vocab_size
+    fr_toks['<unk>'] = vocab_size
+
     
     english = []
     french = []
@@ -179,6 +177,31 @@ def pickle_wmt(num_train_samples=3000, vocab_size=512):
     testset = {b'data': english, b'labels': french}
     with open('../data/wmt_test', 'wb') as fo:
         pickle.dump(testset, fo)
+
+def get_language_model_data(file_path, batch_size=64, shuffle=True):
+    """
+    Given a file path, returns an array of input sequences and an array of label sequences.
+    """
+
+    unpickled_file = unpickle(file_path)
+    inputs = unpickled_file[b'data']
+    labels = unpickled_file[b'labels']
+    idxs = torch.arange(0, len(inputs))
+
+    def collate_batch(batch_data):
+        in_batch, out_batch = [], []
+        make_sentence = lambda x: torch.cat((torch.tensor([1]), torch.tensor(x), torch.tensor([2])))
+        for (input, label) in batch_data:
+            in_batch.append(make_sentence(input))
+            out_batch.append(make_sentence(label))
+        in_batch = torch.nn.utils.rnn.pad_sequence(in_batch, padding_value=0, batch_first=True)
+        out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0, batch_first=True)
+        return in_batch, out_batch
+
+    dataset = list(zip(inputs, labels))
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
+
+    return data_loader
 
 if __name__ == '__main__':
     if args.dataset == 'mnist':
