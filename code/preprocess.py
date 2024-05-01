@@ -198,7 +198,8 @@ def get_language_model_data(file_path, batch_size=64, shuffle=True, include_tok=
             out_sentence = make_sentence(label)
             in_batch.append(in_sentence)
             out_batch.append(out_sentence)
-            idx_batch.append(example_idx)
+            idx_tensor = torch.tensor(example_idx, dtype=torch.int32)
+            idx_batch.append(idx_tensor)
             example_idx += 1
         in_batch = torch.nn.utils.rnn.pad_sequence(in_batch, padding_value=0)
         out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0)

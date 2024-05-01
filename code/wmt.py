@@ -80,14 +80,22 @@ class WMTModel(torch.nn.Module):
                           tgt_mask)
     
     def loss(self, logits, labels):
-        loss_fn = torch.nn.CrossEntropyLoss()
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=513)
         return loss_fn(logits.view(-1, logits.size(-1)), labels[1:, :].view(-1))
+
+    def batch_losses(self, logits, labels):
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='none', ignore_index=513)
+        logits = logits.transpose(0,1).transpose(1,2)
+        labels = labels[1:, :].transpose(0,1)
+        res = loss_fn(logits, labels)
+        res = torch.mean(res, dim=1)
+        return res
     
     def accuracy(self, logits, labels):
         predicted = torch.argmax(logits, dim=-1)
-        correct = labels
-        correct_predictions = (predicted == correct).sum().item()
-        total = labels.size(0)
+        correct = labels[1:, :]
+        correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
+        total = (correct != 0).sum().item()
         return correct_predictions / total
 
 def get_wmt_data():

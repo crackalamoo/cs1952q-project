@@ -88,8 +88,9 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
             else:
                 outputs = model(inputs)
             
-            batch_losses = torch.nn.functional.cross_entropy(
-                outputs, labels.float(), reduction='none')
+            # batch_losses = torch.nn.functional.cross_entropy(
+            #     outputs, labels.float(), reduction='none')
+            batch_losses = model.batch_losses(outputs, labels)
             for idx, loss_i in zip(idxs, batch_losses):
                 idx = idx.item()
                 sample_losses[idx] = np.roll(sample_losses[idx], -1)
@@ -103,7 +104,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         accuracies.append(train_acc)
         losses.append(np.mean(epoch_losses))
         if val_loader is not None:
-            val_loss, val_acc = test(model, val_loader)
+            val_loss, val_acc = test(model, val_loader, use_labels_as_input=use_labels_as_input)
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
             print(
@@ -120,7 +121,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
     return losses, accuracies, times
 
 
-def test(model, test_loader):
+def test(model, test_loader, use_labels_as_input=False):
     model.to("cpu")
     model.eval()
     losses = []
@@ -128,7 +129,10 @@ def test(model, test_loader):
     with torch.no_grad():
         for inputs, labels, idxs in test_loader:
             inputs, labels = inputs, labels
-            outputs = model(inputs)
+            if use_labels_as_input:
+                outputs = model(inputs, labels)
+            else:
+                outputs = model(inputs)
             losses.append(model.loss(outputs, labels))
             accuracy.append(model.accuracy(outputs, labels))
     test_acc = np.mean(accuracy)
