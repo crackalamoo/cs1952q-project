@@ -81,7 +81,10 @@ class WMTModel(torch.nn.Module):
     
     def loss(self, logits, labels):
         loss_fn = torch.nn.CrossEntropyLoss(ignore_index=513)
-        return loss_fn(logits.view(-1, logits.size(-1)), labels[1:, :].view(-1))
+        logits = logits.transpose(0,1).transpose(1,2)
+        labels = labels[1:, :].transpose(0,1)
+        res = loss_fn(logits, labels)
+        return res
 
     def batch_losses(self, logits, labels):
         loss_fn = torch.nn.CrossEntropyLoss(reduction='none', ignore_index=513)

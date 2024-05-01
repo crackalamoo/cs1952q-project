@@ -10,6 +10,7 @@ import torch
 from cifar10 import Cifar10Model, get_cifar10_data
 from mnist import MNISTModel, get_mnist_data
 from wmt import WMTModel, get_wmt_data
+from preprocess import collate_language_batch
 from torch.utils.data import DataLoader, Subset
 
 if __name__ == '__main__':
@@ -20,7 +21,7 @@ if __name__ == '__main__':
 
 EPOCHS = args.epochs
 device = args.device
-USE_CURRICULUM = True
+USE_SAMPLING = True
 LOSS_THRESHOLD = 0.9
 LOSS_THRESHOLD_VELOCITY = 0
 FORCE_PROPORTION = 0.35
@@ -30,7 +31,7 @@ LR = 1e-3
 RUNS = 2
 
 
-def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
+def load_sampling(train_loader, sample_losses, epoch, batch_size=None, collate_fn=None):
     if batch_size is None:
         batch_size = train_loader.batch_size
 
@@ -50,11 +51,12 @@ def load_curriculum(train_loader, sample_losses, epoch, batch_size=None):
     proportion = len(keep_idx)/(len(train_loader)*batch_size)
     print("Proportion kept:", proportion)
 
-    training = DataLoader(subset, batch_size=batch_size, shuffle=True)
+    training = DataLoader(subset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     return training, proportion
 
 
-def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=USE_CURRICULUM, lr=LR, use_labels_as_input=False):
+def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_SAMPLING, lr=LR,
+          use_labels_as_input=False, collate_fn=None):
     losses = []
     accuracies = []
     val_losses = []
@@ -71,10 +73,11 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_curriculum=US
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         accuracy = []
         epoch_losses = []
-        if use_curriculum and epoch >= STORED_LOSSES:
+        if use_sampling and epoch >= STORED_LOSSES:
             start_load = time.time()
-            training, proportion = load_curriculum(
-                train_loader, sample_losses, epoch)
+            training, proportion = load_sampling(
+                train_loader, sample_losses, epoch,
+                collate_fn=collate_fn)
             load_time += time.time() - start_load
             proportions.append(proportion)
         else:
@@ -140,22 +143,23 @@ def test(model, test_loader, use_labels_as_input=False):
     return test_loss, test_acc
 
 
-def do_run(ModelClass, get_data, run_no=0, use_labels_as_input=False):
+def do_run(ModelClass, get_data, run_no=0, use_labels_as_input=False, collate_fn=None):
     train_loader, test_loader, extras = get_data()
 
     model = ModelClass()
     train_res = train(model, train_loader, val_loader=test_loader,
-                      use_labels_as_input=use_labels_as_input, epochs=EPOCHS)
-    train_loss, train_acc, val_loss, val_acc, train_times, proportions = (train_res['loss'],
-                                                                          train_res['acc'], train_res['val_loss'], train_res['val_acc'],
-                                                                          train_res['times'], train_res['prop'])
+                      use_labels_as_input=use_labels_as_input, epochs=EPOCHS,
+                      collate_fn=collate_fn)
+    train_loss, train_acc, val_loss, val_acc, train_times, proportions = (
+        train_res['loss'], train_res['acc'], train_res['val_loss'], train_res['val_acc'],
+        train_res['times'], train_res['prop'])
 
-    test_loss, test_acc = test(model, test_loader)
+    test_loss, test_acc = test(model, test_loader, use_labels_as_input=use_labels_as_input)
 
     print(f"Final Test Accuracy: {test_acc}")
     print(f"Total time: {train_times[-1]} s")
 
-    fname = 'cur' if USE_CURRICULUM else 'reg'
+    fname = 'samp' if USE_SAMPLING else 'reg'
     with open(f'../results/{fname}.npy', 'wb+' if run_no == 0 else 'ab+') as f:
         np.save(f, train_times)
         np.save(f, val_loss)
@@ -191,15 +195,15 @@ def do_graph():
             return new_times, mean_loss, mean_acc, stderr_loss, stderr_acc
         
         reg_times, reg_loss, reg_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
-        if USE_CURRICULUM:
-            cur_times, cur_loss, cur_acc, cur_stderr_loss, cur_stderr_acc = get_stats('cur')
+        if USE_SAMPLING:
+            cur_times, cur_loss, cur_acc, cur_stderr_loss, cur_stderr_acc = get_stats('samp')
 
 
         plt.figure()
-        if USE_CURRICULUM:
-            plt.plot(cur_times, cur_acc, label='curriculum')
+        if USE_SAMPLING:
+            plt.plot(cur_times, cur_acc, label='sampling')
             plt.fill_between(cur_times, cur_acc-cur_stderr_acc, cur_acc+cur_stderr_acc, alpha=0.3)
-        plt.plot(reg_times, reg_acc, label='no curriculum')
+        plt.plot(reg_times, reg_acc, label='no sampling')
         plt.fill_between(reg_times, reg_acc-reg_stderr_acc, reg_acc+reg_stderr_acc, alpha=0.3)
         # plt.plot(cur_times[STORED_LOSSES:],
         #          proportions[STORED_LOSSES:], label='proportion')
@@ -209,10 +213,10 @@ def do_graph():
         plt.savefig('../results/cur_vs_reg.png')
 
         plt.figure()
-        if USE_CURRICULUM:
-            plt.plot(cur_times, cur_loss, label='curriculum')
+        if USE_SAMPLING:
+            plt.plot(cur_times, cur_loss, label='sampling')
             plt.fill_between(cur_times, cur_loss-cur_stderr_loss, cur_loss+cur_stderr_loss, alpha=0.3)
-        plt.plot(reg_times, reg_loss, label='no curriculum')
+        plt.plot(reg_times, reg_loss, label='no sampling')
         plt.fill_between(reg_times, reg_loss-reg_stderr_loss, reg_loss+reg_stderr_loss, alpha=0.3)
         plt.xlabel('Time (s)')
         plt.ylabel('Cross-entropy loss')
@@ -225,7 +229,7 @@ def do_graph():
 def main():
     for i in range(RUNS):
         torch.manual_seed(42+i)
-        do_run(WMTModel, get_wmt_data, i, use_labels_as_input=True)
+        do_run(WMTModel, get_wmt_data, i, use_labels_as_input=True, collate_fn=collate_language_batch)
     do_graph()
 
 if __name__ == '__main__':
