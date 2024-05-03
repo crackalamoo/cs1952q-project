@@ -59,8 +59,9 @@ class WMTModel(torch.nn.Module):
         tgt_input = tgt[:-1, :] # exclude last word, which must be predicted
         src_padding_mask = pad_mask(src)
         tgt_padding_mask = pad_mask(tgt_input)
-        tgt_mask = torch.ones(tgt_input.size()[0], tgt_input.size()[0])
+        tgt_mask = torch.ones(tgt_input.size()[0], tgt_input.size()[0], device=tgt.device)
         tgt_mask = torch.triu(tgt_mask, diagonal=1).bool()
+        # tgt_mask = tgt_mask.to(torch.float32) + torch.finfo(torch.float32).eps  # Add a small value to prevent division by zero
 
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt_input))

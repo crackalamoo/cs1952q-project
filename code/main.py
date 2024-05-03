@@ -69,7 +69,6 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     load_time = 0
     for epoch in range(epochs):
         model.to(device)
-        model.train()
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         accuracy = []
         epoch_losses = []
@@ -83,6 +82,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         else:
             proportions.append(1)
         for inputs, labels, idxs in training:
+            model.train()
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             
@@ -91,18 +91,17 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             else:
                 outputs = model(inputs)
             
-            # batch_losses = torch.nn.functional.cross_entropy(
-            #     outputs, labels.float(), reduction='none')
             batch_losses = model.batch_losses(outputs, labels)
             for idx, loss_i in zip(idxs, batch_losses):
                 idx = idx.item()
                 sample_losses[idx] = np.roll(sample_losses[idx], -1)
                 sample_losses[idx][-1] = loss_i.item()
             loss = torch.mean(batch_losses)
-            accuracy.append(model.accuracy(outputs, labels))
             loss.backward()
             optimizer.step()
             epoch_losses.append(loss.item())
+            model.eval()
+            accuracy.append(model.accuracy(outputs, labels))
         train_acc = np.mean(accuracy)
         accuracies.append(train_acc)
         losses.append(np.mean(epoch_losses))
