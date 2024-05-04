@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from cifar10 import Cifar10Model, get_cifar10_data
 from mnist import MNISTModel, get_mnist_data
-from wmt import WMTModel, get_wmt_data
+from wmt import WMTModel, get_wmt_data, test_translate_callback
 from preprocess import collate_language_batch
 from torch.utils.data import DataLoader, Subset
 
@@ -56,7 +56,7 @@ def load_sampling(train_loader, sample_losses, epoch, batch_size=None, collate_f
 
 
 def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_SAMPLING, lr=LR,
-          use_labels_as_input=False, collate_fn=None):
+          use_labels_as_input=False, collate_fn=None, callback=None):
     losses = []
     accuracies = []
     val_losses = []
@@ -115,6 +115,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)
         print(f"Load time: {load_time} s")
+        if callback is not None:
+            callback(model, epoch)
     if val_loader is not None:
         return {
             'loss': losses, 'acc': accuracies, 'val_loss': val_losses, 'val_acc': val_accuracies,
@@ -146,9 +148,13 @@ def do_run(ModelClass, get_data, run_no=0, use_labels_as_input=False, collate_fn
     train_loader, test_loader, extras = get_data()
 
     model = ModelClass()
+    model.set_data_tok(extras['data_tok'])
+    model.set_labels_tok(extras['labels_tok'])
+
     train_res = train(model, train_loader, val_loader=test_loader,
                       use_labels_as_input=use_labels_as_input, epochs=EPOCHS,
-                      collate_fn=collate_fn)
+                      collate_fn=collate_fn,
+                      callback=test_translate_callback if isinstance(model, WMTModel) else None)
     train_loss, train_acc, val_loss, val_acc, train_times, proportions = (
         train_res['loss'], train_res['acc'], train_res['val_loss'], train_res['val_acc'],
         train_res['times'], train_res['prop'])
@@ -207,7 +213,7 @@ def do_graph():
         # plt.plot(cur_times[STORED_LOSSES:],
         #          proportions[STORED_LOSSES:], label='proportion')
         plt.xlabel('Time (s)')
-        plt.ylabel('Accuracy/proportion')
+        plt.ylabel('Accuracy')
         plt.legend()
         plt.savefig('../results/cur_vs_reg.png')
 

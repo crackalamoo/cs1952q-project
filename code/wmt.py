@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from preprocess import get_language_model_data
+import spacy
 
 # https://pytorch.org/tutorials/beginner/translation_transformer.html#seq2seq-network-using-transformer
 
@@ -53,15 +54,20 @@ class WMTModel(torch.nn.Module):
         self.tgt_tok_emb = TokenEmbedding(vocab_size+2, emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
+        self.data_tok = None
+        self.labels_tok = None
 
-    def forward(self, src: torch.Tensor, tgt: torch.Tensor):
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor, reduce_tgt: bool = True):
         pad_mask = lambda t: (t == 0).transpose(0, 1)
-        tgt_input = tgt[:-1, :] # exclude last word, which must be predicted
+        if reduce_tgt:
+            tgt_input = tgt[:-1, :] # exclude last word, which must be predicted
+        else:
+            tgt_input = tgt
         src_padding_mask = pad_mask(src)
         tgt_padding_mask = pad_mask(tgt_input)
         tgt_mask = torch.ones(tgt_input.size()[0], tgt_input.size()[0], device=tgt.device)
         tgt_mask = torch.triu(tgt_mask, diagonal=1).bool()
-        # tgt_mask = tgt_mask.to(torch.float32) + torch.finfo(torch.float32).eps  # Add a small value to prevent division by zero
+        # tgt_mask = tgt_mask.to(torch.float32) + 1e-6  # Add a small value to prevent division by zero
 
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt_input))
@@ -96,11 +102,93 @@ class WMTModel(torch.nn.Module):
         return res
     
     def accuracy(self, logits, labels):
-        predicted = torch.argmax(logits, dim=-1)
-        correct = labels[1:, :]
-        correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
-        total = (correct != 0).sum().item()
-        return correct_predictions / total
+        # predicted = torch.argmax(logits, dim=-1)
+        # correct = labels[1:, :]
+        # correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
+        # total = (correct != 0).sum().item()
+        # return correct_predictions / total
+
+        # BLEU score computation
+        list_candidate = torch.argmax(logits, dim=-1).transpose(0,1).tolist()
+        list_reference = labels.transpose(0,1).tolist()
+        def get_ngram_counts(seq, n):
+            eos_idx = self.data_tok['<eos>']
+            pad_idx = self.data_tok['<pad>']
+            if eos_idx in seq:
+                if pad_idx in seq:
+                    clip_seq = seq[:min(seq.index(eos_idx)+1, seq.index(pad_idx)+1)]
+                else:
+                    clip_seq = seq[:seq.index(eos_idx)+1]
+            elif pad_idx in seq:
+                clip_seq = seq[:seq.index(pad_idx)+1]
+            else:
+                clip_seq = seq
+            counts = {}
+            for i in range(len(clip_seq)+1-n):
+                sub = tuple(clip_seq[i:i+n])
+                if not sub in counts:
+                    counts[sub] = 0
+                counts[sub] += 1
+            return counts
+        def get_precision_i(i):
+            precision = 0
+            wi = 0
+            for j in range(len(list_candidate)):
+                snt = list_candidate[j]
+                ref = list_reference[j]
+                snt_counts = get_ngram_counts(snt, i)
+                ref_counts = get_ngram_counts(ref, i)
+                for igram in snt_counts:
+                    precision += min(snt_counts[igram], ref_counts[igram] if igram in ref_counts else 0)
+                    wi += snt_counts[igram]
+            if precision != 0:
+                precision /= wi
+            return precision
+        precision = 1
+        for i in range(1, 4+1):
+            precision *= get_precision_i(i)
+        precision **= (1/4.0)
+        ref_len = 0
+        out_len = 0
+        assert len(list_candidate) == len(list_reference)
+        for i in range(len(list_candidate)):
+            ref_len += len(list_reference[i])
+            out_len += len(list_candidate[i])
+        precision *= min(1, np.exp(1 - ref_len/out_len))
+        return precision
+    
+    def set_data_tok(self, tok):
+        self.data_tok = tok
+    def set_labels_tok(self, tok):
+        self.labels_tok = tok
+
+def convert_to_tokens(sentence, tok, tok_name='en_core_web_sm'):
+    # tok is either data_tok or labels_tok, mapping from token text to index
+    spacy_tok = spacy.load(tok_name)
+    sentence = spacy_tok(sentence)
+    return torch.cat([
+        torch.tensor([tok['<bos>']]),
+        torch.tensor([(tok[token.text] if token.text in tok else tok['<unk>']) for token in sentence]),
+        torch.tensor([tok['<eos>']])
+    ])
+
+def tokens_to_string(tokens, tok):
+    reverse_tok = {v: k for k, v in tok.items()}
+    return ' '.join([reverse_tok[token.item()] for token in tokens])
+
+def test_translate_callback(model, epoch):
+    sentence = "i am a student."
+    inputs = convert_to_tokens(sentence, model.data_tok)
+    res = [model.labels_tok['<bos>']]
+    tok = -1
+    inputs = inputs.unsqueeze(1)
+    while tok != model.labels_tok['<eos>'] and len(res) < 50:
+        res_tensor = torch.tensor(res).unsqueeze(1)
+        outputs = model(inputs, res_tensor, reduce_tgt=False)
+        tok = torch.argmax(outputs[-1, 0, :], dim=-1)
+        res.append(tok.item())
+    translation = tokens_to_string(torch.tensor(res), model.labels_tok)
+    print(translation)
 
 def get_wmt_data():
     AUTOGRADER_TRAIN_FILE = '../data/wmt_train'
