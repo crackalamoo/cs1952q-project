@@ -35,10 +35,10 @@ class TokenEmbedding(torch.nn.Module):
 
 class WMTModel(torch.nn.Module):
     def __init__(self,
-                 num_encoder_layers: int = 2,
-                 num_decoder_layers: int = 2,
+                 num_encoder_layers: int = 3,
+                 num_decoder_layers: int = 3,
                  emb_size: int = 512,
-                 nhead: int = 2,
+                 nhead: int = 8,
                  vocab_size: int = 512,
                  dim_feedforward: int = 512,
                  dropout: float = 0.1):
@@ -109,58 +109,78 @@ class WMTModel(torch.nn.Module):
         # return correct_predictions / total
 
         # BLEU score computation
-        list_candidate = torch.argmax(logits, dim=-1).transpose(0,1).tolist()
-        list_reference = labels.transpose(0,1).tolist()
-        def get_ngram_counts(seq, n):
-            eos_idx = self.data_tok['<eos>']
-            pad_idx = self.data_tok['<pad>']
-            if eos_idx in seq:
-                if pad_idx in seq:
-                    clip_seq = seq[:min(seq.index(eos_idx)+1, seq.index(pad_idx)+1)]
+        for label in labels.transpose(0,1).tolist():
+            list_candidate = [self.generate_translation(torch.tensor(label), use_tokens=True)]
+            list_reference = [label]
+            def get_ngram_counts(seq, n):
+                eos_idx = self.data_tok['<eos>']
+                pad_idx = self.data_tok['<pad>']
+                if eos_idx in seq:
+                    if pad_idx in seq:
+                        clip_seq = seq[:min(seq.index(eos_idx)+1, seq.index(pad_idx)+1)]
+                    else:
+                        clip_seq = seq[:seq.index(eos_idx)+1]
+                elif pad_idx in seq:
+                    clip_seq = seq[:seq.index(pad_idx)+1]
                 else:
-                    clip_seq = seq[:seq.index(eos_idx)+1]
-            elif pad_idx in seq:
-                clip_seq = seq[:seq.index(pad_idx)+1]
-            else:
-                clip_seq = seq
-            counts = {}
-            for i in range(len(clip_seq)+1-n):
-                sub = tuple(clip_seq[i:i+n])
-                if not sub in counts:
-                    counts[sub] = 0
-                counts[sub] += 1
-            return counts
-        def get_precision_i(i):
-            precision = 0
-            wi = 0
-            for j in range(len(list_candidate)):
-                snt = list_candidate[j]
-                ref = list_reference[j]
-                snt_counts = get_ngram_counts(snt, i)
-                ref_counts = get_ngram_counts(ref, i)
-                for igram in snt_counts:
-                    precision += min(snt_counts[igram], ref_counts[igram] if igram in ref_counts else 0)
-                    wi += snt_counts[igram]
-            if precision != 0:
-                precision /= wi
+                    clip_seq = seq
+                counts = {}
+                for i in range(len(clip_seq)+1-n):
+                    sub = tuple(clip_seq[i:i+n])
+                    if not sub in counts:
+                        counts[sub] = 0
+                    counts[sub] += 1
+                return counts
+            def get_precision_i(i):
+                precision = 0
+                wi = 0
+                for j in range(len(list_candidate)):
+                    snt = list_candidate[j]
+                    ref = list_reference[j]
+                    snt_counts = get_ngram_counts(snt, i)
+                    ref_counts = get_ngram_counts(ref, i)
+                    for igram in snt_counts:
+                        precision += min(snt_counts[igram], ref_counts[igram] if igram in ref_counts else 0)
+                        wi += snt_counts[igram]
+                if precision != 0:
+                    precision /= wi
+                return precision
+            precision = 1
+            for i in range(1, 4+1):
+                precision *= get_precision_i(i)
+            precision **= (1/4.0)
+            ref_len = 0
+            out_len = 0
+            assert len(list_candidate) == len(list_reference)
+            for i in range(len(list_candidate)):
+                ref_len += len(list_reference[i])
+                out_len += len(list_candidate[i])
+            precision *= min(1, np.exp(1 - ref_len/out_len))
             return precision
-        precision = 1
-        for i in range(1, 4+1):
-            precision *= get_precision_i(i)
-        precision **= (1/4.0)
-        ref_len = 0
-        out_len = 0
-        assert len(list_candidate) == len(list_reference)
-        for i in range(len(list_candidate)):
-            ref_len += len(list_reference[i])
-            out_len += len(list_candidate[i])
-        precision *= min(1, np.exp(1 - ref_len/out_len))
-        return precision
     
     def set_data_tok(self, tok):
         self.data_tok = tok
     def set_labels_tok(self, tok):
         self.labels_tok = tok
+
+    def generate_translation(self, sentence, use_tokens=False):
+        if not use_tokens:
+            inputs = convert_to_tokens(sentence, self.data_tok)
+        else:
+            inputs = sentence
+        res = [self.labels_tok['<bos>']]
+        tok = -1
+        inputs = inputs.unsqueeze(1)
+        while tok != self.labels_tok['<eos>'] and len(res) < 50:
+            res_tensor = torch.tensor(res).unsqueeze(1)
+            outputs = self(inputs, res_tensor, reduce_tgt=False)
+            tok = torch.argmax(outputs[-1, 0, :], dim=-1)
+            res.append(tok.item())
+        if not use_tokens:
+            translation = tokens_to_string(torch.tensor(res), self.labels_tok)
+        else:
+            translation = res
+        return translation
 
 def convert_to_tokens(sentence, tok, tok_name='en_core_web_sm'):
     # tok is either data_tok or labels_tok, mapping from token text to index
@@ -174,20 +194,11 @@ def convert_to_tokens(sentence, tok, tok_name='en_core_web_sm'):
 
 def tokens_to_string(tokens, tok):
     reverse_tok = {v: k for k, v in tok.items()}
-    return ' '.join([reverse_tok[token.item()] for token in tokens])
+    return ' '.join([(reverse_tok[token.item()] if token.item() in reverse_tok else '<unk>') for token in tokens])
 
-def test_translate_callback(model, epoch):
+def test_translate_callback(model: WMTModel, epoch):
     sentence = "i am a student."
-    inputs = convert_to_tokens(sentence, model.data_tok)
-    res = [model.labels_tok['<bos>']]
-    tok = -1
-    inputs = inputs.unsqueeze(1)
-    while tok != model.labels_tok['<eos>'] and len(res) < 50:
-        res_tensor = torch.tensor(res).unsqueeze(1)
-        outputs = model(inputs, res_tensor, reduce_tgt=False)
-        tok = torch.argmax(outputs[-1, 0, :], dim=-1)
-        res.append(tok.item())
-    translation = tokens_to_string(torch.tensor(res), model.labels_tok)
+    translation = model.generate_translation(sentence)
     print(translation)
 
 def get_wmt_data():

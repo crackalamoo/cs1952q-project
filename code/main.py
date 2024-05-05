@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
 EPOCHS = args.epochs
 device = args.device
-USE_SAMPLING = True
+USE_SAMPLING = False
 LOSS_THRESHOLD = 0.9
 LOSS_THRESHOLD_VELOCITY = 0
 FORCE_PROPORTION = 0.35
