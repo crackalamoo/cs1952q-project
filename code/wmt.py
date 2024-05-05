@@ -87,14 +87,14 @@ class WMTModel(torch.nn.Module):
                           tgt_mask)
     
     def loss(self, logits, labels):
-        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=513)
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=0)
         logits = logits.transpose(0,1).transpose(1,2)
         labels = labels[1:, :].transpose(0,1)
         res = loss_fn(logits, labels)
         return res
 
     def batch_losses(self, logits, labels):
-        loss_fn = torch.nn.CrossEntropyLoss(reduction='none', ignore_index=513)
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='none', ignore_index=0)
         logits = logits.transpose(0,1).transpose(1,2)
         labels = labels[1:, :].transpose(0,1)
         res = loss_fn(logits, labels)
@@ -102,11 +102,11 @@ class WMTModel(torch.nn.Module):
         return res
     
     def accuracy(self, logits, labels):
-        # predicted = torch.argmax(logits, dim=-1)
-        # correct = labels[1:, :]
-        # correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
-        # total = (correct != 0).sum().item()
-        # return correct_predictions / total
+        predicted = torch.argmax(logits, dim=-1)
+        correct = labels[1:, :]
+        correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
+        total = (correct != 0).sum().item()
+        return correct_predictions / total
 
         # BLEU score computation
         for label in labels.transpose(0,1).tolist():
@@ -174,6 +174,9 @@ class WMTModel(torch.nn.Module):
         while tok != self.labels_tok['<eos>'] and len(res) < 50:
             res_tensor = torch.tensor(res).unsqueeze(1)
             outputs = self(inputs, res_tensor, reduce_tgt=False)
+            outputs[:,:,self.labels_tok['<bos>']] = -np.inf
+            outputs[:,:,self.labels_tok['<pad>']] = -np.inf
+            outputs[:,:,self.labels_tok['<unk>']] = -np.inf
             tok = torch.argmax(outputs[-1, 0, :], dim=-1)
             res.append(tok.item())
         if not use_tokens:

@@ -93,7 +93,7 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_train_samples=3000):
+def pickle_wmt(num_train_samples=1000):
     en_tok = spacy.load('en_core_web_sm')
     fr_tok = spacy.load('fr_core_news_sm')
 
@@ -119,17 +119,17 @@ def pickle_wmt(num_train_samples=3000):
     
     en_freqs = sorted(en_freqs.items(), key=lambda x: x[1], reverse=True)
     fr_freqs = sorted(fr_freqs.items(), key=lambda x: x[1], reverse=True)
-    for i in range(vocab_size-3):
-        en_toks[en_freqs[i][0]] = i+3
-        fr_toks[fr_freqs[i][0]] = i+3
+    for i in range(vocab_size-4):
+        en_toks[en_freqs[i][0]] = i+4
+        fr_toks[fr_freqs[i][0]] = i+4
     en_toks['<pad>'] = 0
     fr_toks['<pad>'] = 0
     en_toks['<bos>'] = 1
     fr_toks['<bos>'] = 1
     en_toks['<eos>'] = 2
     fr_toks['<eos>'] = 2
-    en_toks['<unk>'] = vocab_size
-    fr_toks['<unk>'] = vocab_size
+    en_toks['<unk>'] = 3
+    fr_toks['<unk>'] = 3
 
     
     english = []
@@ -139,12 +139,12 @@ def pickle_wmt(num_train_samples=3000):
         fr_i = []
         for token in english_spacy[i]:
             if token.text not in en_toks:
-                en_i.append(len(en_toks))
+                en_i.append(en_toks['<unk>'])
             else:
                 en_i.append(en_toks[token.text])
         for token in french_spacy[i]:
             if token.text not in fr_toks:
-                fr_i.append(len(fr_toks))
+                fr_i.append(fr_toks['<unk>'])
             else:
                 fr_i.append(fr_toks[token.text])
         english.append(en_i)
@@ -165,12 +165,12 @@ def pickle_wmt(num_train_samples=3000):
         fr_i = []
         for token in en_tokenized:
             if token.text not in en_toks:
-                en_i.append(len(en_toks))
+                en_i.append(en_toks['<unk>'])
             else:
                 en_i.append(en_toks[token.text])
         for token in fr_tokenized:
             if token.text not in fr_toks:
-                fr_i.append(len(fr_toks))
+                fr_i.append(fr_toks['<unk>'])
             else:
                 fr_i.append(fr_toks[token.text])
         english.append(en_i)
