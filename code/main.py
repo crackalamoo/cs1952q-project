@@ -110,7 +110,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
             print(
-                f"Epoch: {epoch}, Training Accuracy: {train_acc}, Validation Accuracy: {val_acc}")
+                f"Epoch: {epoch}, Train Acc: {train_acc}, Train Loss: {np.mean(epoch_losses)}, Val Acc: {val_acc}, Val Loss: {val_loss}")
         else:
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)

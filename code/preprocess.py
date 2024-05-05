@@ -193,7 +193,7 @@ def collate_language_batch(batch_data):
     out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0)
     return in_batch, out_batch, idx_batch
 
-def get_language_model_data(file_path, batch_size=64, shuffle=True, include_tok=False):
+def get_language_model_data(file_path, batch_size=128, shuffle=True, include_tok=False):
     """
     Given a file path, returns an array of input sequences and an array of label sequences.
     """

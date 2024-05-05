@@ -50,8 +50,8 @@ class WMTModel(torch.nn.Module):
                                        dim_feedforward=dim_feedforward,
                                        dropout=dropout)
         self.generator = torch.nn.Linear(emb_size, vocab_size)
-        self.src_tok_emb = TokenEmbedding(vocab_size+2, emb_size)
-        self.tgt_tok_emb = TokenEmbedding(vocab_size+2, emb_size)
+        self.src_tok_emb = TokenEmbedding(vocab_size, emb_size)
+        self.tgt_tok_emb = TokenEmbedding(vocab_size, emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
         self.data_tok = None
@@ -65,15 +65,17 @@ class WMTModel(torch.nn.Module):
             tgt_input = tgt
         src_padding_mask = pad_mask(src)
         tgt_padding_mask = pad_mask(tgt_input)
-        tgt_mask = torch.ones(tgt_input.size()[0], tgt_input.size()[0], device=tgt.device)
-        tgt_mask = torch.triu(tgt_mask, diagonal=1).bool()
-        # tgt_mask = tgt_mask.to(torch.float32) + 1e-6  # Add a small value to prevent division by zero
+        tgt_mask = (torch.triu(torch.ones((tgt_input.size(0), tgt_input.size(0)), device=tgt.device)) == 1).transpose(0, 1)
+        tgt_mask = tgt_mask.float().masked_fill(tgt_mask == 0, float('-inf')).masked_fill(tgt_mask == 1, float(0.0))
+        src_mask = torch.zeros(src.size(0), src.size(0), device=src.device).bool()
 
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt_input))
-        outs = self.transformer(src_emb, tgt_emb, tgt_mask=tgt_mask,
+        outs = self.transformer(src_emb, tgt_emb,
+                                src_mask=src_mask, tgt_mask=tgt_mask,
                                 src_key_padding_mask=src_padding_mask,
-                                tgt_key_padding_mask=tgt_padding_mask)
+                                tgt_key_padding_mask=tgt_padding_mask,
+                                memory_key_padding_mask=src_padding_mask)
         logits = self.generator(outs)
         return logits
 
