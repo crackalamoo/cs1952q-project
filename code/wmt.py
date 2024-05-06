@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from preprocess import get_language_model_data
 import spacy
+import heapq
 
 # https://pytorch.org/tutorials/beginner/translation_transformer.html#seq2seq-network-using-transformer
 
@@ -37,11 +38,11 @@ class WMTModel(torch.nn.Module):
     def __init__(self,
                  num_encoder_layers: int = 3,
                  num_decoder_layers: int = 3,
-                 emb_size: int = 512,
+                 emb_size: int = 1024,
                  nhead: int = 8,
                  vocab_size: int = 512,
-                 dim_feedforward: int = 512,
-                 dropout: float = 0.1):
+                 dim_feedforward: int = 1024,
+                 dropout: float = 0.0):
         super(WMTModel, self).__init__()
         self.transformer = torch.nn.Transformer(d_model=emb_size,
                                        nhead=nhead,
@@ -58,16 +59,16 @@ class WMTModel(torch.nn.Module):
         self.labels_tok = None
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor, reduce_tgt: bool = True):
-        pad_mask = lambda t: (t == 0).transpose(0, 1)
+        pad_mask = lambda t: (t == 0).transpose(0, 1).float()
         if reduce_tgt:
-            tgt_input = tgt[:-1, :] # exclude last word, which must be predicted
+            tgt_input = tgt[:-1, :] # exclude last token, which must be predicted
         else:
             tgt_input = tgt
         src_padding_mask = pad_mask(src)
         tgt_padding_mask = pad_mask(tgt_input)
         tgt_mask = (torch.triu(torch.ones((tgt_input.size(0), tgt_input.size(0)), device=tgt.device)) == 1).transpose(0, 1)
         tgt_mask = tgt_mask.float().masked_fill(tgt_mask == 0, float('-inf')).masked_fill(tgt_mask == 1, float(0.0))
-        src_mask = torch.zeros(src.size(0), src.size(0), device=src.device).bool()
+        src_mask = torch.zeros(src.size(0), src.size(0), device=src.device).float()
 
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(tgt_input))
@@ -91,7 +92,7 @@ class WMTModel(torch.nn.Module):
     def loss(self, logits, labels):
         loss_fn = torch.nn.CrossEntropyLoss(ignore_index=0)
         logits = logits.transpose(0,1).transpose(1,2)
-        labels = labels[1:, :].transpose(0,1)
+        labels = labels[1:, :].transpose(0,1) # exclude first token, which is only used as input
         res = loss_fn(logits, labels)
         return res
 
