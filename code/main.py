@@ -18,20 +18,25 @@ if __name__ == '__main__':
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--model", default="wmt")
+    parser.add_argument('--samp', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--samp-prop", type=float, default=0.55)
+    parser.add_argument("--reintroduce", type=float, default=0.2)
+    parser.add_argument("--store-loss", type=int, default=2)
+    parser.add_argument("--runs", type=int, default=2)
     args = parser.parse_args()
 
     EPOCHS = args.epochs
     device = args.device
     MODEL = args.model
-    USE_SAMPLING = False
+    USE_SAMPLING = args.samp
     LOSS_THRESHOLD = 0.9
     LOSS_THRESHOLD_VELOCITY = 0
-    FORCE_PROPORTION = 0.55
-    REINTRODUCE_LEARNED = 0.2
-    STORED_LOSSES = 1
+    FORCE_PROPORTION = args.samp_prop
+    REINTRODUCE_LEARNED = args.reintroduce
+    STORED_LOSSES = args.store_loss
     STOP_SAMPLING = 20
     LR = 5e-5
-    RUNS = 2
+    RUNS = args.runs
 
 
 def load_sampling(train_loader, sample_losses, epoch, batch_size=None, collate_fn=None):
@@ -185,64 +190,68 @@ def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
     
 
 def do_graph():
-    try:
-        def get_stats(fname):
-            total_times = []
-            total_loss = []
-            total_acc = []
-            with open(f'../results/{fname}.npy', 'rb') as f:
-                for i in range(RUNS):
-                    reg_times = np.load(f)
-                    reg_loss = np.load(f)
-                    reg_acc = np.load(f)
-                    total_times.append(reg_times)
-                    total_loss.append(reg_loss)
-                    total_acc.append(reg_acc)
-            new_times = np.linspace(np.min(total_times), np.max(total_times), 1000)
-            def get_extrapolated_values(times, values):
-                new_values = np.interp(new_times, times, values)
-                return new_values
-            total_loss = [get_extrapolated_values(reg_times, reg_loss) for reg_times,reg_loss in zip(total_times, total_loss)]
-            total_acc = [get_extrapolated_values(reg_times, reg_acc) for reg_times,reg_acc in zip(total_times, total_acc)]
-            total_loss = np.array(total_loss)
-            total_acc = np.array(total_acc)
-            mean_loss = np.mean(total_loss, axis=0)
-            mean_acc = np.mean(total_acc, axis=0)
-            stderr_loss = np.std(total_loss, axis=0, ddof=1)/np.sqrt(total_loss.shape[0])
-            stderr_acc = np.std(total_acc, axis=0, ddof=1)/np.sqrt(total_acc.shape[0])
-            return new_times, mean_loss, mean_acc, stderr_loss, stderr_acc
-        
-        reg_times, reg_loss, reg_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
-        if USE_SAMPLING:
-            cur_times, cur_loss, cur_acc, cur_stderr_loss, cur_stderr_acc = get_stats('samp')
+    def get_stats(fname):
+        total_times = []
+        total_loss = []
+        total_acc = []
+        with open(f'../results/{fname}.npy', 'rb') as f:
+            for i in range(RUNS):
+                reg_times = np.load(f)
+                reg_loss = np.load(f)
+                reg_acc = np.load(f)
+                total_times.append(reg_times)
+                total_loss.append(reg_loss)
+                total_acc.append(reg_acc)
+        new_times = np.linspace(np.min(total_times), np.max(total_times), 1000)
+        def get_extrapolated_values(times, values):
+            new_values = np.interp(new_times, times, values)
+            return new_values
+        total_loss = [get_extrapolated_values(reg_times, reg_loss) for reg_times,reg_loss in zip(total_times, total_loss)]
+        total_acc = [get_extrapolated_values(reg_times, reg_acc) for reg_times,reg_acc in zip(total_times, total_acc)]
+        total_loss = np.array(total_loss)
+        total_acc = np.array(total_acc)
+        mean_loss = np.mean(total_loss, axis=0)
+        mean_acc = np.mean(total_acc, axis=0)
+        stdev_loss = np.std(total_loss, axis=0, ddof=1)
+        stdev_acc = np.std(total_acc, axis=0, ddof=1)
+        stderr_loss = stdev_loss/np.sqrt(total_loss.shape[0])
+        stderr_acc =stdev_acc/np.sqrt(total_acc.shape[0])
+        return new_times, mean_loss, mean_acc, stdev_loss, stdev_acc, stderr_loss, stderr_acc
+    
+    reg_times, reg_loss, reg_acc, reg_stdev_loss, reg_stdev_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
+    if USE_SAMPLING:
+        cur_times, cur_loss, cur_acc, cur_stdev_loss, cur_stdev_acc, cur_stderr_loss, cur_stderr_acc = get_stats('samp')
 
 
-        plt.figure()
-        if USE_SAMPLING:
-            plt.plot(cur_times, cur_acc, label='sampling')
-            plt.fill_between(cur_times, cur_acc-cur_stderr_acc, cur_acc+cur_stderr_acc, alpha=0.3)
-        plt.plot(reg_times, reg_acc, label='no sampling')
-        plt.fill_between(reg_times, reg_acc-reg_stderr_acc, reg_acc+reg_stderr_acc, alpha=0.3)
-        # plt.plot(cur_times[STORED_LOSSES:],
-        #          proportions[STORED_LOSSES:], label='proportion')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.savefig('../results/cur_vs_reg.png')
+    plt.rcParams.update({'font.size': 16})
+    plt.figure(figsize=(5.6,4.2), dpi=200)
+    if USE_SAMPLING:
+        plt.plot(cur_times, cur_acc, label='sampling', color='tab:orange')
+        # plt.fill_between(cur_times, cur_acc-cur_stderr_acc, cur_acc+cur_stderr_acc, alpha=0.3, color='tab:orange')
+        plt.fill_between(cur_times, cur_acc-cur_stdev_acc, cur_acc+cur_stdev_acc, alpha=0.15, color='tab:orange')
+    plt.plot(reg_times, reg_acc, label='no sampling', color='tab:blue')
+    # plt.fill_between(reg_times, reg_acc-reg_stderr_acc, reg_acc+reg_stderr_acc, alpha=0.3, color='tab:blue')
+    plt.fill_between(reg_times, reg_acc-reg_stdev_acc, reg_acc+reg_stdev_acc, alpha=0.15, color='tab:blue')
+    # plt.plot(cur_times[STORED_LOSSES:],
+    #          proportions[STORED_LOSSES:], label='proportion')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.savefig('../results/cur_vs_reg.png', bbox_inches='tight')
 
-        plt.figure()
-        if USE_SAMPLING:
-            plt.plot(cur_times, cur_loss, label='sampling')
-            plt.fill_between(cur_times, cur_loss-cur_stderr_loss, cur_loss+cur_stderr_loss, alpha=0.3)
-        plt.plot(reg_times, reg_loss, label='no sampling')
-        plt.fill_between(reg_times, reg_loss-reg_stderr_loss, reg_loss+reg_stderr_loss, alpha=0.3)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Cross-entropy loss')
-        plt.legend()
-        plt.savefig('../results/cur_vs_reg_loss.png')
-        plt.show()
-    except FileNotFoundError:
-        pass
+    plt.figure(figsize=(5.6,4.2), dpi=200)
+    if USE_SAMPLING:
+        plt.plot(cur_times, cur_loss, label='sampling', color='tab:orange')
+        # plt.fill_between(cur_times, cur_loss-cur_stderr_loss, cur_loss+cur_stderr_loss, alpha=0.3, color='tab:orange')
+        plt.fill_between(cur_times, cur_loss-cur_stdev_loss, cur_loss+cur_stdev_loss, alpha=0.15, color='tab:orange')
+    plt.plot(reg_times, reg_loss, label='no sampling', color='tab:blue')
+    # plt.fill_between(reg_times, reg_loss-reg_stderr_loss, reg_loss+reg_stderr_loss, alpha=0.3, color='tab:blue')
+    plt.fill_between(reg_times, reg_loss-reg_stdev_loss, reg_loss+reg_stdev_loss, alpha=0.15, color='tab:blue')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Cross-entropy loss')
+    plt.legend()
+    plt.savefig('../results/cur_vs_reg_loss.png', bbox_inches='tight')
+    plt.show()
 
 def main():
     model_class = {
@@ -268,7 +277,10 @@ def main():
     for i in range(RUNS):
         torch.manual_seed(42+i)
         do_run(model_class, data_func, i, grad_clip=grad_clip, collate_fn=collate_func)
-    do_graph()
+    try:
+        do_graph()
+    except FileNotFoundError:
+        print("Missing data for graphing")
 
 if __name__ == '__main__':
     main()
