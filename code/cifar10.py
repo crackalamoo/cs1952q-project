@@ -82,6 +82,10 @@ class Cifar10Model(torch.nn.Module):
         loss = torch.nn.CrossEntropyLoss()(logits, torch.argmax(labels, dim=1))
         self.loss_list.append(loss)
         return loss
+    
+    def batch_losses(self, logits, labels):
+        loss = torch.nn.CrossEntropyLoss(reduction='none')(logits, torch.argmax(labels, dim=1))
+        return loss
 
     def accuracy(self, logits, labels):
         """
