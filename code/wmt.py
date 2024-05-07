@@ -38,10 +38,10 @@ class WMTModel(torch.nn.Module):
     def __init__(self,
                  num_encoder_layers: int = 3,
                  num_decoder_layers: int = 3,
-                 emb_size: int = 1024,
+                 emb_size: int = 512,
                  nhead: int = 8,
                  vocab_size: int = 512,
-                 dim_feedforward: int = 1024,
+                 dim_feedforward: int = 512,
                  dropout: float = 0.0):
         super(WMTModel, self).__init__()
         self.transformer = torch.nn.Transformer(d_model=emb_size,
@@ -105,11 +105,11 @@ class WMTModel(torch.nn.Module):
         return res
     
     def accuracy(self, logits, labels):
-        predicted = torch.argmax(logits, dim=-1)
-        correct = labels[1:, :]
-        correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
-        total = (correct != 0).sum().item()
-        return correct_predictions / total
+        # predicted = torch.argmax(logits, dim=-1)
+        # correct = labels[1:, :]
+        # correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
+        # total = (correct != 0).sum().item()
+        # return correct_predictions / total
 
         # BLEU score computation
         for label in labels.transpose(0,1).tolist():
@@ -203,7 +203,7 @@ def tokens_to_string(tokens, tok):
     return ' '.join([(reverse_tok[token.item()] if token.item() in reverse_tok else '<unk>') for token in tokens])
 
 def test_translate_callback(model: WMTModel, epoch):
-    sentence = "i am a student."
+    sentence = "i am the president of the european parliament."
     translation = model.generate_translation(sentence)
     print(translation)
 

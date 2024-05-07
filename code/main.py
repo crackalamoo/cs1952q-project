@@ -17,18 +17,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--model", default="wmt")
     args = parser.parse_args()
 
-EPOCHS = args.epochs
-device = args.device
-USE_SAMPLING = False
-LOSS_THRESHOLD = 0.9
-LOSS_THRESHOLD_VELOCITY = 0
-FORCE_PROPORTION = 0.35
-REINTRODUCE_LEARNED = 0.2
-STORED_LOSSES = 1
-LR = 1e-4
-RUNS = 2
+    EPOCHS = args.epochs
+    device = args.device
+    MODEL = args.model
+    USE_SAMPLING = False
+    LOSS_THRESHOLD = 0.9
+    LOSS_THRESHOLD_VELOCITY = 0
+    FORCE_PROPORTION = 0.35
+    REINTRODUCE_LEARNED = 0.2
+    STORED_LOSSES = 1
+    LR = 5e-5
+    RUNS = 2
 
 
 def load_sampling(train_loader, sample_losses, epoch, batch_size=None, collate_fn=None):
@@ -147,25 +149,28 @@ def test(model, test_loader, use_labels_as_input=False):
     return test_loss, test_acc
 
 
-def do_run(ModelClass, get_data, run_no=0, use_labels_as_input=False, grad_clip=False, collate_fn=None):
+def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
     train_loader, test_loader, extras = get_data()
 
     model = ModelClass()
-    model.set_data_tok(extras['data_tok'])
-    model.set_labels_tok(extras['labels_tok'])
+    is_translate = isinstance(model, WMTModel)
+    if is_translate:
+        model.set_data_tok(extras['data_tok'])
+        model.set_labels_tok(extras['labels_tok'])
     for p in model.parameters():
         if p.dim() > 1:
             torch.nn.init.xavier_uniform_(p)
 
+    
     train_res = train(model, train_loader, val_loader=test_loader,
-                      use_labels_as_input=use_labels_as_input, epochs=EPOCHS,
+                      use_labels_as_input=is_translate, epochs=EPOCHS,
                       collate_fn=collate_fn, grad_clip=grad_clip,
-                      callback=test_translate_callback if isinstance(model, WMTModel) else None)
+                      callback=test_translate_callback if is_translate else None)
     train_loss, train_acc, val_loss, val_acc, train_times, proportions = (
         train_res['loss'], train_res['acc'], train_res['val_loss'], train_res['val_acc'],
         train_res['times'], train_res['prop'])
 
-    test_loss, test_acc = test(model, test_loader, use_labels_as_input=use_labels_as_input)
+    test_loss, test_acc = test(model, test_loader, use_labels_as_input=is_translate)
 
     print(f"Final Test Accuracy: {test_acc}")
     print(f"Total time: {train_times[-1]} s")
@@ -238,9 +243,29 @@ def do_graph():
         pass
 
 def main():
+    model_class = {
+        'mnist': MNISTModel,
+        'cifar10': Cifar10Model,
+        'wmt': WMTModel
+    }[MODEL]
+    data_func = {
+        'mnist': get_mnist_data,
+        'cifar10': get_cifar10_data,
+        'wmt': get_wmt_data
+    }[MODEL]
+    collate_func = {
+        'mnist': None,
+        'cifar10': None,
+        'wmt': collate_language_batch
+    }[MODEL]
+    grad_clip = {
+        'mnist': False,
+        'cifar10': False,
+        'wmt': True
+    }[MODEL]
     for i in range(RUNS):
         torch.manual_seed(42+i)
-        do_run(WMTModel, get_wmt_data, i, use_labels_as_input=True, grad_clip=True, collate_fn=collate_language_batch)
+        do_run(model_class, data_func, i, grad_clip=grad_clip, collate_fn=collate_func)
     do_graph()
 
 if __name__ == '__main__':
