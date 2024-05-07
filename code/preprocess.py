@@ -44,14 +44,6 @@ def pickle_mnist():
     shutil.rmtree('./data')
 
 def get_image_classifier_data(file_path, classes=None, num_channels=3, image_size=32, batch_size=64, shuffle=True):
-    """
-    Given a file path and two target classes, returns an array of 
-    normalized inputs (images) and an array of labels.
-
-    :return: normalized NumPy array of inputs and tensor of labels, where 
-    inputs are of type np.float32 and has size (num_inputs, width, height, num_channels) and labels 
-    has size (num_examples, num_classes)
-    """
     unpickled_file = unpickle(file_path)
     inputs = unpickled_file[b'data']
     labels = unpickled_file[b'labels']

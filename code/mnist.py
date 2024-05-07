@@ -3,11 +3,6 @@ from preprocess import get_image_classifier_data
 
 class MNISTModel(torch.nn.Module):
     def __init__(self):
-        """
-        This model class will contain the architecture for your CNN that 
-        classifies images. We have left in variables in the constructor
-        for you to fill out, but you are welcome to change them if you'd like.
-        """
         super(MNISTModel, self).__init__()
 
         self.batch_size = 64
@@ -42,12 +37,6 @@ class MNISTModel(torch.nn.Module):
         self.flatten = torch.nn.Flatten()
 
     def forward(self, inputs):
-        """
-        Runs a forward pass on an input batch of images.
-
-        :param inputs: images, shape of (num_inputs, 28, 28, 1); during training, the shape is (batch_size, 28, 28, 1)
-        :return: logits - a matrix of shape (num_inputs, num_classes); during training, it would be (batch_size, 2)
-        """
         out = inputs
         for i, conv_fn, pool_fn in zip(range(len(self.conv_fns)), self.conv_fns, self.pool_fns):
             out = conv_fn(out)
@@ -65,16 +54,6 @@ class MNISTModel(torch.nn.Module):
         return logits
 
     def loss(self, logits, labels):
-        """
-        Calculates the model cross-entropy loss after one forward pass.
-        Softmax is applied in this function.
-
-        :param logits: during training, a matrix of shape (batch_size, self.num_classes) 
-        containing the result of multiple convolution and feed forward layers
-        :param labels: during training, matrix of shape (batch_size, self.num_classes) containing the train labels
-        :return: the loss of the model as a Tensor
-        """
-
         loss = torch.nn.CrossEntropyLoss()(logits, torch.argmax(labels, dim=1))
         self.loss_list.append(loss)
         return loss
@@ -84,16 +63,6 @@ class MNISTModel(torch.nn.Module):
         return loss
 
     def accuracy(self, logits, labels):
-        """
-        Calculates the model's prediction accuracy by comparing
-        logits to correct labels – no need to modify this.
-
-        :param logits: a matrix of size (num_inputs, self.num_classes); during training, this will be (batch_size, self.num_classes)
-        containing the result of multiple convolution and feed forward layers
-        :param labels: matrix of size (num_labels, self.num_classes) containing the answers, during training, this will be (batch_size, self.num_classes)
-
-        :return: the accuracy of the model as a Tensor
-        """
         predicted = torch.argmax(logits, dim=1)
         correct = torch.argmax(labels, dim=1)
         correct_predictions = (predicted == correct).sum().item()
