@@ -70,11 +70,12 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     val_losses = []
     val_accuracies = []
     training = train_loader
-    sample_losses = defaultdict(lambda: 900*np.ones(STORED_LOSSES))
+    sample_losses = defaultdict(lambda: np.full(STORED_LOSSES, np.inf))
     times = []
     proportions = []
     start_time = time.time()
-    load_time = 0
+    rebatch_time = 0.0
+    eval_time = 0.0
     for epoch in range(epochs):
         model.to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -85,7 +86,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             training, proportion = load_sampling(
                 train_loader, sample_losses, epoch,
                 collate_fn=collate_fn)
-            load_time += time.time() - start_load
+            rebatch_time += time.time() - start_load
             proportions.append(proportion)
         else:
             training = train_loader
@@ -111,8 +112,10 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             epoch_losses.append(loss.item())
+            start_eval = time.time()
             model.eval()
             acc_i = model.accuracy(outputs, labels)
+            eval_time += time.time() - start_eval
             accuracy.append(acc_i)
         train_acc = np.mean(accuracy)
         accuracies.append(train_acc)
@@ -126,13 +129,16 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         else:
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)
-        print(f"Load time: {load_time} s")
+        print(f"Rebatch time: {rebatch_time} s")
+        print(f"Evaluation time: {eval_time} s")
         if callback is not None:
             callback(model, epoch)
+        if device == 'cuda':
+            torch.cuda.empty_cache()
     if val_loader is not None:
         return {
             'loss': losses, 'acc': accuracies, 'val_loss': val_losses, 'val_acc': val_accuracies,
-            'times': times, 'prop': proportions
+            'times': times, 'prop': proportions, 'rebatch_time': rebatch_time, 'eval_time': eval_time
         }
     return losses, accuracies, times
 
@@ -173,14 +179,15 @@ def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
                       use_labels_as_input=is_translate, epochs=EPOCHS,
                       collate_fn=collate_fn, grad_clip=grad_clip,
                       callback=test_translate_callback if is_translate else None)
-    train_loss, train_acc, val_loss, val_acc, train_times, proportions = (
+    train_loss, train_acc, val_loss, val_acc, train_times, proportions, rebatch_time, eval_time = (
         train_res['loss'], train_res['acc'], train_res['val_loss'], train_res['val_acc'],
-        train_res['times'], train_res['prop'])
+        train_res['times'], train_res['prop'], train_res['rebatch_time'], train_res['eval_time'])
 
     test_loss, test_acc = test(model, test_loader, use_labels_as_input=is_translate)
 
-    print(f"Final Test Accuracy: {test_acc}")
+    print(f"Final test accuracy: {test_acc}")
     print(f"Total time: {train_times[-1]} s")
+    print(f"Rebatch time: {rebatch_time} s")
 
     fname = 'samp' if USE_SAMPLING else 'reg'
     with open(f'../results/{fname}.npy', 'wb+' if run_no == 0 else 'ab+') as f:

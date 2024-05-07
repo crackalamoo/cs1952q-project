@@ -112,8 +112,11 @@ class WMTModel(torch.nn.Module):
         # return correct_predictions / total
 
         # BLEU score computation
-        for label in labels.transpose(0,1).tolist():
-            list_candidate = [self.generate_translation(torch.tensor(label), use_tokens=True)]
+        bleu_iter = labels.transpose(0,1).tolist()
+        if len(bleu_iter) > 20:
+            bleu_iter = bleu_iter[:20]
+        for label in bleu_iter:
+            list_candidate = [self.generate_translation(torch.tensor(label, device=labels.device), use_tokens=True)]
             list_reference = [label]
             def get_ngram_counts(seq, n):
                 eos_idx = self.data_tok['<eos>']
@@ -175,7 +178,7 @@ class WMTModel(torch.nn.Module):
         tok = -1
         inputs = inputs.unsqueeze(1)
         while tok != self.labels_tok['<eos>'] and len(res) < 50:
-            res_tensor = torch.tensor(res).unsqueeze(1)
+            res_tensor = torch.tensor(res, device=inputs.device).unsqueeze(1)
             outputs = self(inputs, res_tensor, reduce_tgt=False)
             outputs[:,:,self.labels_tok['<bos>']] = -np.inf
             outputs[:,:,self.labels_tok['<pad>']] = -np.inf

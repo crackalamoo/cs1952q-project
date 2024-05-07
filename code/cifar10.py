@@ -12,7 +12,6 @@ class Cifar10Model(torch.nn.Module):
 
         # Initialize all hyperparameters
         self.hidden_layer1 = 16
-        self.hidden_layer2 = 16
         self.dropout_rate = 0.25
 
         self.dropout = torch.nn.Dropout(self.dropout_rate)
@@ -37,9 +36,8 @@ class Cifar10Model(torch.nn.Module):
         self.batch_norm5 = torch.nn.BatchNorm2d(20)
 
         self.linear = torch.nn.Linear(20*5*5, self.hidden_layer1)
-        self.hidden1 = torch.nn.Linear(self.hidden_layer1, self.hidden_layer1)
-        self.hidden2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
-        self.linears = [self.linear, self.hidden2]
+        self.linear2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
+        self.linears = [self.linear, self.linear2]
 
         self.flatten = torch.nn.Flatten()
 
@@ -86,6 +84,7 @@ class Cifar10Model(torch.nn.Module):
             logits = linear(logits)
             if i < len(self.linears) - 1:
                 logits = torch.nn.functional.relu(logits)
+                logits = self.dropout(logits)
 
         return logits
 
