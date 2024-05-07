@@ -26,9 +26,10 @@ if __name__ == '__main__':
     USE_SAMPLING = False
     LOSS_THRESHOLD = 0.9
     LOSS_THRESHOLD_VELOCITY = 0
-    FORCE_PROPORTION = 0.35
+    FORCE_PROPORTION = 0.55
     REINTRODUCE_LEARNED = 0.2
     STORED_LOSSES = 1
+    STOP_SAMPLING = 20
     LR = 5e-5
     RUNS = 2
 
@@ -74,7 +75,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         accuracy = []
         epoch_losses = []
-        if use_sampling and epoch >= STORED_LOSSES:
+        if use_sampling and epoch >= STORED_LOSSES and epoch < STOP_SAMPLING:
             start_load = time.time()
             training, proportion = load_sampling(
                 train_loader, sample_losses, epoch,
@@ -82,6 +83,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             load_time += time.time() - start_load
             proportions.append(proportion)
         else:
+            training = train_loader
             proportions.append(1)
         for inputs, labels, idxs in training:
             model.train()
