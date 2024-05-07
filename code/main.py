@@ -22,7 +22,7 @@ if __name__ == '__main__':
     parser.add_argument("--samp-prop", type=float, default=0.55)
     parser.add_argument("--reintroduce", type=float, default=0.2)
     parser.add_argument("--store-loss", type=int, default=2)
-    parser.add_argument("--runs", type=int, default=2)
+    parser.add_argument("--runs", type=int, default=1)
     args = parser.parse_args()
 
     EPOCHS = args.epochs
@@ -212,6 +212,8 @@ def do_graph():
         total_acc = np.array(total_acc)
         mean_loss = np.mean(total_loss, axis=0)
         mean_acc = np.mean(total_acc, axis=0)
+        if total_loss.shape[0] == 1:
+            return new_times, mean_loss, mean_acc, 0, 0, 0, 0
         stdev_loss = np.std(total_loss, axis=0, ddof=1)
         stdev_acc = np.std(total_acc, axis=0, ddof=1)
         stderr_loss = stdev_loss/np.sqrt(total_loss.shape[0])

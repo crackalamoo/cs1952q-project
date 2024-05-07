@@ -15,6 +15,8 @@ class Cifar10Model(torch.nn.Module):
         self.hidden_layer2 = 16
         self.dropout_rate = 0.25
 
+        self.dropout = torch.nn.Dropout(self.dropout_rate)
+
         self.res_fn1 = torch.nn.Conv2d(3, 16, 3, stride=1, padding='same')
         self.res_fn2 = torch.nn.Conv2d(16, 16, 3, stride=1, padding='same')
         self.res_skip1 = torch.nn.Conv2d(3, 16, 1, stride=1, padding='same')
@@ -22,18 +24,19 @@ class Cifar10Model(torch.nn.Module):
         self.res_fn3 = torch.nn.Conv2d(16, 20, 3, stride=1, padding='same')
         self.res_fn4 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
         self.res_skip2 = torch.nn.Conv2d(16, 20, 1, stride=1, padding='same')
+
+        self.conv1 = torch.nn.Conv2d(20, 20, 3, stride=1)
+        self.conv2 = torch.nn.Conv2d(20, 20, 3, stride=1)
         
         self.pool_fn = torch.nn.MaxPool2d(3, stride=2)
 
         self.batch_norm1 = torch.nn.BatchNorm2d(16)
-        self.batch_norm2 = torch.nn.BatchNorm2d(20)
+        self.batch_norm2 = torch.nn.BatchNorm2d(16)
         self.batch_norm3 = torch.nn.BatchNorm2d(20)
+        self.batch_norm4 = torch.nn.BatchNorm2d(20)
+        self.batch_norm5 = torch.nn.BatchNorm2d(20)
 
-        # self.conv_fns = [self.conv_fn1]
-        # self.pool_fns = [self.pool_fn1]
-        # self.batch_fns = [self.batch_norm1]
-        # self.dropout = torch.nn.Dropout(self.dropout_rate)
-        self.linear = torch.nn.Linear(20*7*7, self.hidden_layer1)
+        self.linear = torch.nn.Linear(20*5*5, self.hidden_layer1)
         self.hidden1 = torch.nn.Linear(self.hidden_layer1, self.hidden_layer1)
         self.hidden2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
         self.linears = [self.linear, self.hidden2]
@@ -49,11 +52,12 @@ class Cifar10Model(torch.nn.Module):
 
         # Residual block
         out = self.res_fn1(out)
+        out = self.batch_norm1(out)
         out = torch.nn.functional.relu(out)
         out = self.res_fn2(out)
         out = torch.nn.functional.relu(out)
-        out = self.batch_norm1(out)
         out = self.res_skip1(inputs) + out
+        out = self.batch_norm2(out)
         out = torch.nn.functional.relu(out)
 
         out = self.pool_fn(out)
@@ -62,17 +66,26 @@ class Cifar10Model(torch.nn.Module):
         # Residual block
         pre_res = out
         out = self.res_fn3(out)
+        out = self.batch_norm3(out)
         out = torch.nn.functional.relu(out)
         out = self.res_fn4(out)
-        out = self.batch_norm2(out)
         out = self.res_skip2(pre_res) + out
+        out = self.batch_norm4(out)
+        out = torch.nn.functional.relu(out)
+
+        out = self.conv1(out)
+        out = self.batch_norm5(out)
+        out = torch.nn.functional.relu(out)
+        out = self.conv2(out)
         out = torch.nn.functional.relu(out)
 
         out = self.pool_fn(out)
 
         logits = self.flatten(out)
-        for linear in self.linears:
+        for i, linear in enumerate(self.linears):
             logits = linear(logits)
+            if i < len(self.linears) - 1:
+                logits = torch.nn.functional.relu(logits)
 
         return logits
 
