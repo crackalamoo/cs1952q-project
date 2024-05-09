@@ -205,7 +205,7 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000, lang='fr'):
         pickle.dump(trainset, fo)
     print("Finished pickling training set")
 
-    dataset = load_dataset('wmt/wmt14', data_dir='fr-en', split='validation', streaming=True)
+    dataset = load_dataset('wmt/wmt14', data_dir=f'{lang}-en', split='validation', streaming=True)
     english = []
     french = []
     def get_tokens(sentence, tok):

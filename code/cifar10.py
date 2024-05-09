@@ -25,12 +25,12 @@ class Cifar10Model(torch.nn.Module):
         self.res_fn4 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
         self.res_skip2 = torch.nn.Conv2d(16, 20, 1, stride=1, padding='same')
 
-        self.res_fn5 = torch.nn.Conv2d(20, 32, 3, stride=1, padding='same')
-        self.res_fn6 = torch.nn.Conv2d(32, 32, 3, stride=1, padding='same')
-        self.res_skip3 = torch.nn.Conv2d(20, 32, 1, stride=1, padding='same')
+        self.res_fn5 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
+        self.res_fn6 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
+        self.res_skip3 = torch.nn.Conv2d(20, 20, 1, stride=1, padding='same')
 
-        self.conv1 = torch.nn.Conv2d(32, 32, 3, stride=1)
-        self.conv2 = torch.nn.Conv2d(32, 32, 3, stride=1)
+        self.conv1 = torch.nn.Conv2d(20, 20, 3, stride=1)
+        self.conv2 = torch.nn.Conv2d(20, 20, 3, stride=1)
         
         self.pool_fn = torch.nn.MaxPool2d(3, stride=2)
 
@@ -38,11 +38,11 @@ class Cifar10Model(torch.nn.Module):
         self.batch_norm2 = torch.nn.BatchNorm2d(16)
         self.batch_norm3 = torch.nn.BatchNorm2d(20)
         self.batch_norm4 = torch.nn.BatchNorm2d(20)
-        self.batch_norm5 = torch.nn.BatchNorm2d(32)
-        self.batch_norm6 = torch.nn.BatchNorm2d(32)
-        self.batch_norm7 = torch.nn.BatchNorm2d(32)
+        self.batch_norm5 = torch.nn.BatchNorm2d(20)
+        self.batch_norm6 = torch.nn.BatchNorm2d(20)
+        self.batch_norm7 = torch.nn.BatchNorm2d(20)
 
-        self.linear = torch.nn.Linear(32*5*5, self.hidden_layer1)
+        self.linear = torch.nn.Linear(20*5*5, self.hidden_layer1)
         self.linear2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
         self.linears = [self.linear, self.linear2]
 
