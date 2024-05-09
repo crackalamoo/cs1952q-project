@@ -104,7 +104,7 @@ class WMTModel(torch.nn.Module):
         res = torch.mean(res, dim=1)
         return res
     
-    def accuracy(self, logits, labels):
+    def accuracy(self, logits, labels, max_samples=500):
         # predicted = torch.argmax(logits, dim=-1)
         # correct = labels[1:, :]
         # correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
@@ -132,7 +132,17 @@ class WMTModel(torch.nn.Module):
                     counts[sub] = 0
                 counts[sub] += 1
             return counts
+
+        if labels.size(1) > max_samples:
+            bleu_iter = labels[:, :max_samples]
+        else:
+            bleu_iter = labels
+        
+        # for label in bleu_iter:
+        list_candidate = self.generate_translation_parallel(bleu_iter)
+        list_reference = bleu_iter.transpose(0,1).tolist()
         def get_precision_i(i):
+            nonlocal list_candidate, list_reference
             precision = 0
             wi = 0
             for j in range(len(list_candidate)):
@@ -147,25 +157,23 @@ class WMTModel(torch.nn.Module):
                 precision /= wi
             return precision
 
-        bleu_iter = labels.transpose(0,1).tolist()
-        if len(bleu_iter) > 20:
-            bleu_iter = bleu_iter[:20]
-        for label in bleu_iter:
-            list_candidate = [self.generate_translation(torch.tensor(label, device=labels.device), use_tokens=True)]
-            list_reference = [label]
+        precision = 1.0
+        for i in range(1, 4+1):
+            precision *= get_precision_i(i)
+        precision **= (1/4.0)
+        ref_len = 0
+        out_len = 0
+        assert len(list_candidate) == len(list_reference)
+        for i in range(len(list_candidate)):
+            ref_len += len(get_clip_seq(list_reference[i]))
+            out_len += len(get_clip_seq(list_candidate[i]))
+        precision *= min(1, np.exp(1 - ref_len/out_len))
 
-            precision = 1.0
-            for i in range(1, 4+1):
-                precision *= get_precision_i(i)
-            precision **= (1/4.0)
-            ref_len = 0
-            out_len = 0
-            assert len(list_candidate) == len(list_reference)
-            for i in range(len(list_candidate)):
-                ref_len += len(get_clip_seq(list_reference[i]))
-                out_len += len(get_clip_seq(list_candidate[i]))
-            precision *= min(1, np.exp(1 - ref_len/out_len))
-            return precision
+        if np.random.random() < 0.1:
+            print(tokens_to_string(torch.tensor(get_clip_seq(list_candidate[0])), self.labels_tok))
+            print(tokens_to_string(torch.tensor(get_clip_seq(list_reference[0])), self.labels_tok))
+            print(precision)
+        return precision
     
     def set_data_tok(self, tok):
         self.data_tok = tok
@@ -193,6 +201,21 @@ class WMTModel(torch.nn.Module):
         else:
             translation = res
         return translation
+    
+    def generate_translation_parallel(self, sentences, max_len=70):
+        inputs = sentences
+        res = [[self.labels_tok['<bos>']] for _ in range(inputs.size(1))]
+        toks = [-1 for _ in range(inputs.size(1))]
+        while any([tok != self.labels_tok['<eos>'] for tok in toks]) and len(res[0]) < max_len:
+            res_tensor = torch.tensor(res, device=inputs.device).transpose(0, 1)
+            outputs = self(inputs, res_tensor, reduce_tgt=False)
+            outputs[:,:,self.labels_tok['<bos>']] = -np.inf
+            outputs[:,:,self.labels_tok['<pad>']] = -np.inf
+            outputs[:,:,self.labels_tok['<unk>']] = -np.inf
+            toks = torch.argmax(outputs[-1, :, :], dim=-1)
+            for i in range(len(res)):
+                res[i].append(toks[i].item())
+        return res
 
 def convert_to_tokens(sentence, tok, tok_name='en_core_web_sm'):
     # tok is either data_tok or labels_tok, mapping from token text to index

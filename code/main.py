@@ -77,9 +77,9 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     start_time = time.time()
     rebatch_time = 0.0
     val_time = 0.0
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     for epoch in range(epochs):
         model.to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         accuracy = []
         epoch_losses = []
         if use_sampling and epoch >= STORED_LOSSES and epoch < STOP_SAMPLING:
@@ -93,6 +93,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             training = train_loader
             proportions.append(1)
         for batch_no, (inputs, labels, idxs) in enumerate(training):
+            print(batch_no)
             model.train()
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
@@ -113,8 +114,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             epoch_losses.append(loss.item())
-            if not isinstance(model, WMTModel) or batch_no < 25:
-                # 25 batches times 20 sample sentences per batch is 500 sample sentences for validation
+            if not isinstance(model, WMTModel) or batch_no < 2:
+                # 2 batches times 64 sample sentences per batch is 128 sample sentences for validation
                 start_val = time.time()
                 model.eval()
                 acc_i = model.accuracy(outputs, labels)
@@ -124,7 +125,9 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         accuracies.append(train_acc)
         losses.append(np.mean(epoch_losses))
         if val_loader is not None:
-            val_loss, val_acc = test(model, val_loader, use_labels_as_input=use_labels_as_input)
+            val_loss, val_acc = test(model, val_loader,
+                                     use_labels_as_input=use_labels_as_input,
+                                     max_batch=2 if isinstance(model, WMTModel) else None)
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
             print(
@@ -148,13 +151,13 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     return losses, accuracies, times
 
 
-def test(model, test_loader, use_labels_as_input=False):
+def test(model, test_loader, use_labels_as_input=False, max_batch=None):
     model.to("cpu")
     model.eval()
     losses = []
     accuracy = []
     with torch.no_grad():
-        for inputs, labels, idxs in test_loader:
+        for batch_no, (inputs, labels, idxs) in enumerate(test_loader):
             inputs, labels = inputs, labels
             if use_labels_as_input:
                 outputs = model(inputs, labels)
@@ -162,6 +165,8 @@ def test(model, test_loader, use_labels_as_input=False):
                 outputs = model(inputs)
             losses.append(model.loss(outputs, labels))
             accuracy.append(model.accuracy(outputs, labels))
+            if max_batch is not None and batch_no >= max_batch:
+                break
     test_acc = np.mean(accuracy)
     test_loss = np.mean(losses)
     return test_loss, test_acc
