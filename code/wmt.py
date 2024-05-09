@@ -210,6 +210,14 @@ def test_translate_callback(model: WMTModel, epoch):
     translation = model.generate_translation(sentence)
     print(translation)
 
+    sentence = "i am a student."
+    translation = model.generate_translation(sentence)
+    print(translation)
+
+    sentence = "\"There is no need for radical surgery when all you need to do is take an aspirin,\" said Randy Rentschler, the commission's director of legislation and public affairs."
+    translation = model.generate_translation(sentence)
+    print(translation)
+
 def get_wmt_data():
     AUTOGRADER_TRAIN_FILE = '../data/wmt_train'
     AUTOGRADER_TEST_FILE = '../data/wmt_test'
