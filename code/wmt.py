@@ -112,46 +112,49 @@ class WMTModel(torch.nn.Module):
         # return correct_predictions / total
 
         # BLEU score computation
+        def get_clip_seq(seq):
+            eos_idx = self.data_tok['<eos>']
+            pad_idx = self.data_tok['<pad>']
+            if eos_idx in seq:
+                if pad_idx in seq:
+                    return seq[:min(seq.index(eos_idx)+1, seq.index(pad_idx)+1)]
+                else:
+                    return seq[:seq.index(eos_idx)+1]
+            elif pad_idx in seq:
+                return seq[:seq.index(pad_idx)+1]
+            return seq
+        def get_ngram_counts(seq, n):
+            clip_seq = get_clip_seq(seq)
+            counts = {}
+            for i in range(len(clip_seq)+1-n):
+                sub = tuple(clip_seq[i:i+n])
+                if not sub in counts:
+                    counts[sub] = 0
+                counts[sub] += 1
+            return counts
+        def get_precision_i(i):
+            precision = 0
+            wi = 0
+            for j in range(len(list_candidate)):
+                snt = list_candidate[j]
+                ref = list_reference[j]
+                snt_counts = get_ngram_counts(snt, i)
+                ref_counts = get_ngram_counts(ref, i)
+                for igram in snt_counts:
+                    precision += min(snt_counts[igram], ref_counts[igram] if igram in ref_counts else 0)
+                    wi += snt_counts[igram]
+            if precision != 0:
+                precision /= wi
+            return precision
+
         bleu_iter = labels.transpose(0,1).tolist()
         if len(bleu_iter) > 20:
             bleu_iter = bleu_iter[:20]
         for label in bleu_iter:
             list_candidate = [self.generate_translation(torch.tensor(label, device=labels.device), use_tokens=True)]
             list_reference = [label]
-            def get_ngram_counts(seq, n):
-                eos_idx = self.data_tok['<eos>']
-                pad_idx = self.data_tok['<pad>']
-                if eos_idx in seq:
-                    if pad_idx in seq:
-                        clip_seq = seq[:min(seq.index(eos_idx)+1, seq.index(pad_idx)+1)]
-                    else:
-                        clip_seq = seq[:seq.index(eos_idx)+1]
-                elif pad_idx in seq:
-                    clip_seq = seq[:seq.index(pad_idx)+1]
-                else:
-                    clip_seq = seq
-                counts = {}
-                for i in range(len(clip_seq)+1-n):
-                    sub = tuple(clip_seq[i:i+n])
-                    if not sub in counts:
-                        counts[sub] = 0
-                    counts[sub] += 1
-                return counts
-            def get_precision_i(i):
-                precision = 0
-                wi = 0
-                for j in range(len(list_candidate)):
-                    snt = list_candidate[j]
-                    ref = list_reference[j]
-                    snt_counts = get_ngram_counts(snt, i)
-                    ref_counts = get_ngram_counts(ref, i)
-                    for igram in snt_counts:
-                        precision += min(snt_counts[igram], ref_counts[igram] if igram in ref_counts else 0)
-                        wi += snt_counts[igram]
-                if precision != 0:
-                    precision /= wi
-                return precision
-            precision = 1
+
+            precision = 1.0
             for i in range(1, 4+1):
                 precision *= get_precision_i(i)
             precision **= (1/4.0)
@@ -159,8 +162,8 @@ class WMTModel(torch.nn.Module):
             out_len = 0
             assert len(list_candidate) == len(list_reference)
             for i in range(len(list_candidate)):
-                ref_len += len(list_reference[i])
-                out_len += len(list_candidate[i])
+                ref_len += len(get_clip_seq(list_reference[i]))
+                out_len += len(get_clip_seq(list_candidate[i]))
             precision *= min(1, np.exp(1 - ref_len/out_len))
             return precision
     
@@ -169,7 +172,7 @@ class WMTModel(torch.nn.Module):
     def set_labels_tok(self, tok):
         self.labels_tok = tok
 
-    def generate_translation(self, sentence, use_tokens=False):
+    def generate_translation(self, sentence, use_tokens=False, max_len=70):
         if not use_tokens:
             inputs = convert_to_tokens(sentence, self.data_tok)
         else:
@@ -177,7 +180,7 @@ class WMTModel(torch.nn.Module):
         res = [self.labels_tok['<bos>']]
         tok = -1
         inputs = inputs.unsqueeze(1)
-        while tok != self.labels_tok['<eos>'] and len(res) < 50:
+        while tok != self.labels_tok['<eos>'] and len(res) < max_len:
             res_tensor = torch.tensor(res, device=inputs.device).unsqueeze(1)
             outputs = self(inputs, res_tensor, reduce_tgt=False)
             outputs[:,:,self.labels_tok['<bos>']] = -np.inf
