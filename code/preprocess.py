@@ -96,11 +96,11 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
+def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000, lang='fr'):
     en_tok = spacy.load('en_core_web_sm')
-    fr_tok = spacy.load('fr_core_news_sm')
+    fr_tok = spacy.load(f'{lang}_core_news_sm')
 
-    dataset = load_dataset('wmt/wmt14', data_dir='fr-en', split='train', streaming=True)
+    dataset = load_dataset('wmt/wmt14', data_dir=f'{lang}-en', split='train', streaming=True)
     english_spacy = []
     french_spacy = []
     en_toks = {}
@@ -120,12 +120,12 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
             break
         translation = row['translation']
         add_sentence(translation['en'], en_freqs, english_spacy, en_tok)
-        add_sentence(translation['fr'], fr_freqs, french_spacy, fr_tok)
+        add_sentence(translation[lang], fr_freqs, french_spacy, fr_tok)
     print("Finished tokenizing WMT14")
 
     url_base = 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/'
-    train_urls = ('train.en.gz', 'train.fr.gz')
-    val_urls = ('val.en.gz', 'val.fr.gz')
+    train_urls = ('train.en.gz', f'train.{lang}.gz')
+    val_urls = ('val.en.gz', f'val.{lang}.gz')
 
     train_filepaths = []
     val_filepaths = []
@@ -222,7 +222,7 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
             break
         translation = row['translation']
         en_i = get_tokens(translation['en'], en_tok)
-        fr_i = get_tokens(translation['fr'], fr_tok)
+        fr_i = get_tokens(translation[lang], fr_tok)
         english.append(en_i)
         french.append(fr_i)
     with gzip.open(val_filepaths[0], 'rb') as f:
