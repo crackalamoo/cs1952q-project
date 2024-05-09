@@ -41,7 +41,7 @@ class WMTModel(torch.nn.Module):
                  emb_size: int = 512,
                  nhead: int = 8,
                  vocab_size: int = 4096,
-                 dim_feedforward: int = 1024,
+                 dim_feedforward: int = 512,
                  dropout: float = 0.1):
         super(WMTModel, self).__init__()
         self.transformer = torch.nn.Transformer(d_model=emb_size,
@@ -179,8 +179,10 @@ class WMTModel(torch.nn.Module):
             out_len += len(get_clip_seq(list_candidate[i]))
         precision *= min(1, np.exp(1 - ref_len/out_len))
 
-        print(tokens_to_string(torch.tensor(get_clip_seq(list_candidate[0])), self.labels_tok))
-        print(tokens_to_string(torch.tensor(get_clip_seq(list_reference[0])), self.labels_tok))
+        print("SNT", tokens_to_string(torch.tensor(get_clip_seq(list_candidate[0])), self.labels_tok))
+        print("REF", tokens_to_string(torch.tensor(get_clip_seq(list_reference[0])), self.labels_tok))
+        print("SNT", tokens_to_string(torch.tensor(get_clip_seq(list_candidate[-1])), self.labels_tok))
+        print("REF", tokens_to_string(torch.tensor(get_clip_seq(list_reference[-1])), self.labels_tok))
         print(precision)
         return precision
     
@@ -220,7 +222,7 @@ class WMTModel(torch.nn.Module):
             outputs = self(inputs, res_tensor, reduce_tgt=False)
             outputs[:,:,self.labels_tok['<bos>']] = -np.inf
             outputs[:,:,self.labels_tok['<pad>']] = -np.inf
-            outputs[:,:,self.labels_tok['<unk>']] = -np.inf
+            # outputs[:,:,self.labels_tok['<unk>']] = -np.inf
             toks = torch.argmax(outputs[-1, :, :], dim=-1)
             for i in range(len(res)):
                 res[i].append(toks[i].item())

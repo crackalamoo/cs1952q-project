@@ -96,7 +96,7 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000, lang='fr'):
+def pickle_wmt(num_wmt_samples=0, num_30k_samples=29000, lang='fr'):
     en_tok = spacy.load('en_core_web_sm')
     fr_tok = spacy.load(f'{lang}_core_news_sm')
 
@@ -243,6 +243,7 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000, lang='fr'):
             french.append(fr_i)
 
     print("Finished creating test set")
+    print(f"Test set size: {len(english)}, {len(french)}")
     testset = {b'data': english, b'labels': french}
     with open('../data/wmt_test', 'wb') as fo:
         pickle.dump(testset, fo)

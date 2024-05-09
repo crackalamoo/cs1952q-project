@@ -113,13 +113,11 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             epoch_losses.append(loss.item())
-            if not isinstance(model, WMTModel) or batch_no < 1:
-                # (batch_size) sample sentences for train accuracy
-                start_val = time.time()
-                model.eval()
-                acc_i = model.accuracy(outputs, labels)
-                val_time += time.time() - start_val
-                accuracy.append(acc_i)
+            start_val = time.time()
+            model.eval()
+            acc_i = model.accuracy(outputs, labels)
+            val_time += time.time() - start_val
+            accuracy.append(acc_i)
         train_acc = np.mean(accuracy)
         accuracies.append(train_acc)
         losses.append(np.mean(epoch_losses))
