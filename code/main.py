@@ -113,8 +113,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             epoch_losses.append(loss.item())
-            if not isinstance(model, WMTModel) or batch_no < 2:
-                # 2 batches times 64 sample sentences per batch is 128 sample sentences for validation
+            if not isinstance(model, WMTModel) or batch_no < 1:
+                # (batch_size) sample sentences for train accuracy
                 start_val = time.time()
                 model.eval()
                 acc_i = model.accuracy(outputs, labels)
@@ -126,8 +126,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         if val_loader is not None:
             start_val = time.time()
             val_loss, val_acc = test(model, val_loader,
-                                     use_labels_as_input=use_labels_as_input,
-                                     max_batch=2 if isinstance(model, WMTModel) else None)
+                                     use_labels_as_input=use_labels_as_input)
             val_time += time.time() - start_val
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
@@ -152,7 +151,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     return losses, accuracies, times
 
 
-def test(model, test_loader, use_labels_as_input=False, max_batch=None):
+def test(model, test_loader, use_labels_as_input=False):
     model.to("cpu")
     model.eval()
     losses = []
@@ -165,9 +164,10 @@ def test(model, test_loader, use_labels_as_input=False, max_batch=None):
             else:
                 outputs = model(inputs)
             losses.append(model.loss(outputs, labels))
-            accuracy.append(model.accuracy(outputs, labels))
-            if max_batch is not None and batch_no >= max_batch:
-                break
+            if not isinstance(model, WMTModel):
+                accuracy.append(model.accuracy(outputs, labels))
+        if isinstance(model, WMTModel):
+            accuracy = [ model.val_bleu(test_loader) ]
     test_acc = np.mean(accuracy)
     test_loss = np.mean(losses)
     return test_loss, test_acc

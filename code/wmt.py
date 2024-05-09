@@ -111,7 +111,29 @@ class WMTModel(torch.nn.Module):
         # total = (correct != 0).sum().item()
         # return correct_predictions / total
 
-        # BLEU score computation
+        if labels.size(1) > max_samples:
+            bleu_iter = labels[:, :max_samples]
+        else:
+            bleu_iter = labels
+        list_candidate = self.generate_translation_parallel(bleu_iter)
+        list_reference = bleu_iter.transpose(0,1).tolist()
+        return self.bleu(list_candidate, list_reference)
+
+    def val_bleu(self, val_loader, max_samples=500):
+        list_candidate = []
+        list_reference = []
+        for _, (data, labels, idxs) in enumerate(val_loader):
+            if len(list_candidate) + labels.size(1) > max_samples:
+                bleu_iter = labels[:, :max_samples - len(list_candidate)]
+            else:
+                bleu_iter = labels
+            list_candidate.extend(self.generate_translation_parallel(bleu_iter))
+            list_reference.extend(bleu_iter.transpose(0,1).tolist())
+            if len(list_candidate) >= max_samples:
+                break
+        return self.bleu(list_candidate, list_reference)
+
+    def bleu(self, list_candidate, list_reference):
         def get_clip_seq(seq):
             eos_idx = self.data_tok['<eos>']
             pad_idx = self.data_tok['<pad>']
@@ -128,21 +150,10 @@ class WMTModel(torch.nn.Module):
             counts = {}
             for i in range(len(clip_seq)+1-n):
                 sub = tuple(clip_seq[i:i+n])
-                if not sub in counts:
-                    counts[sub] = 0
-                counts[sub] += 1
+                counts[sub] = counts.get(sub, 0) + 1
             return counts
-
-        if labels.size(1) > max_samples:
-            bleu_iter = labels[:, :max_samples]
-        else:
-            bleu_iter = labels
         
-        # for label in bleu_iter:
-        list_candidate = self.generate_translation_parallel(bleu_iter)
-        list_reference = bleu_iter.transpose(0,1).tolist()
         def get_precision_i(i):
-            nonlocal list_candidate, list_reference
             precision = 0
             wi = 0
             for j in range(len(list_candidate)):
@@ -151,10 +162,9 @@ class WMTModel(torch.nn.Module):
                 snt_counts = get_ngram_counts(snt, i)
                 ref_counts = get_ngram_counts(ref, i)
                 for igram in snt_counts:
-                    precision += min(snt_counts[igram], ref_counts[igram] if igram in ref_counts else 0)
+                    precision += min(snt_counts[igram], ref_counts.get(igram, 0))
                     wi += snt_counts[igram]
-            if precision != 0:
-                precision /= wi
+            precision /= wi
             return precision
 
         precision = 1.0
