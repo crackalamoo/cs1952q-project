@@ -40,7 +40,7 @@ class WMTModel(torch.nn.Module):
                  num_decoder_layers: int = 3,
                  emb_size: int = 512,
                  nhead: int = 8,
-                 vocab_size: int = 1024,
+                 vocab_size: int = 4096,
                  dim_feedforward: int = 512,
                  dropout: float = 0.1):
         super(WMTModel, self).__init__()

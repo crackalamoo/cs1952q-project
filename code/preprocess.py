@@ -7,13 +7,14 @@ import torchvision
 from torchvision import transforms
 from datasets import load_dataset
 import spacy
+import gzip
 import shutil
 import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset")
-    parser.add_argument("--vocab_size", default=1024, type=int)
+    parser.add_argument("--vocab_size", default=4096, type=int)
     args = parser.parse_args()
     vocab_size = args.vocab_size
 
@@ -75,7 +76,7 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_train_samples=100000):
+def pickle_wmt(num_wmt_samples=30000, num_30k_samples=30000):
     en_tok = spacy.load('en_core_web_sm')
     fr_tok = spacy.load('fr_core_news_sm')
 
@@ -86,20 +87,55 @@ def pickle_wmt(num_train_samples=100000):
     fr_toks = {}
     en_freqs = {}
     fr_freqs = {}
+
+    def add_sentence(sentence, freqs, arr, tok):
+        sentence = tok(sentence.lower())
+        for token in sentence:
+            freqs[token.text] = freqs.get(token.text, 0) + 1
+        arr.append(sentence)
+
+
     for i, row in enumerate(iter(dataset)):
-        translation = row['translation']
-        en_i = en_tok(translation['en'].lower())
-        fr_i = fr_tok(translation['fr'].lower())
-        for token in en_i:
-            en_freqs[token.text] = en_freqs.get(token.text, 0) + 1
-        for token in fr_i:
-            fr_freqs[token.text] = fr_freqs.get(token.text, 0) + 1
-        english_spacy.append(en_i)
-        french_spacy.append(fr_i)
-        if i == num_train_samples-1:
+        if i == num_wmt_samples:
             break
-    
-    print("Finished tokenizing")
+        translation = row['translation']
+        add_sentence(translation['en'], en_freqs, english_spacy, en_tok)
+        add_sentence(translation['fr'], fr_freqs, french_spacy, fr_tok)
+    print("Finished tokenizing WMT14")
+
+    url_base = 'https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/'
+    train_urls = ('train.en.gz', 'train.fr.gz')
+    val_urls = ('val.en.gz', 'val.fr.gz')
+
+    train_filepaths = []
+    val_filepaths = []
+    import urllib
+    for url in train_urls:
+        train_filepath = '../data/'+url.split('/')[-1]
+        with urllib.request.urlopen(url_base + url) as response, open(train_filepath, 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+        train_filepaths.append(train_filepath)
+    for url in val_urls:
+        val_filepath = '../data/'+url.split('/')[-1]
+        with urllib.request.urlopen(url_base + url) as response, open(val_filepath, 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+        val_filepaths.append(val_filepath)
+    with gzip.open(train_filepaths[0], 'rb') as f:
+        train_en = f.readlines()
+        for i, line in enumerate(train_en):
+            if i == num_30k_samples:
+                break
+            en_i = line.decode('utf-8')
+            add_sentence(en_i, en_freqs, english_spacy, en_tok)
+    with gzip.open(train_filepaths[1], 'rb') as f:
+        train_fr = f.readlines()
+        for i, line in enumerate(train_fr):
+            if i == num_30k_samples:
+                break
+            fr_i = line.decode('utf-8')
+            add_sentence(fr_i, fr_freqs, french_spacy, fr_tok)
+    print("Finished tokenizing Multi30k")
+
     en_freqs = sorted(en_freqs.items(), key=lambda x: x[1], reverse=True)
     fr_freqs = sorted(fr_freqs.items(), key=lambda x: x[1], reverse=True)
     print(f'English vocab size: {len(en_freqs)}')
@@ -123,10 +159,10 @@ def pickle_wmt(num_train_samples=100000):
     en_toks['<unk>'] = 3
     fr_toks['<unk>'] = 3
 
-    
+
     english = []
     french = []
-    for i in range(num_train_samples):
+    for i in range(num_wmt_samples + num_30k_samples):
         en_i = []
         fr_i = []
         for token in english_spacy[i]:
@@ -151,24 +187,40 @@ def pickle_wmt(num_train_samples=100000):
     dataset = load_dataset('wmt/wmt14', data_dir='fr-en', split='validation', streaming=True)
     english = []
     french = []
+    def get_tokens(sentence, tok):
+        sentence = tok(sentence.lower())
+        res = []
+        for token in sentence:
+            if token.text in en_toks:
+                res.append(en_toks[token.text])
+            else:
+                res.append(en_toks['<unk>'])
+        return res
     for i, row in enumerate(iter(dataset)):
+        if i == num_wmt_samples:
+            break
         translation = row['translation']
-        en_tokenized = en_tok(translation['en'].lower())
-        fr_tokenized = fr_tok(translation['fr'].lower())
-        en_i = []
-        fr_i = []
-        for token in en_tokenized:
-            if token.text not in en_toks:
-                en_i.append(en_toks['<unk>'])
-            else:
-                en_i.append(en_toks[token.text])
-        for token in fr_tokenized:
-            if token.text not in fr_toks:
-                fr_i.append(fr_toks['<unk>'])
-            else:
-                fr_i.append(fr_toks[token.text])
+        en_i = get_tokens(translation['en'], en_tok)
+        fr_i = get_tokens(translation['fr'], fr_tok)
         english.append(en_i)
         french.append(fr_i)
+    with gzip.open(val_filepaths[0], 'rb') as f:
+        val_en = f.readlines()
+        for i, line in enumerate(val_en):
+            if i == num_30k_samples:
+                break
+            en_i = line.decode('utf-8')
+            en_i = get_tokens(en_i, en_tok)
+            english.append(en_i)
+    with gzip.open(val_filepaths[1], 'rb') as f:
+        val_fr = f.readlines()
+        for i, line in enumerate(val_fr):
+            if i == num_30k_samples:
+                break
+            fr_i = line.decode('utf-8')
+            fr_i = get_tokens(fr_i, fr_tok)
+            french.append(fr_i)
+
     print("Finished creating test set")
     testset = {b'data': english, b'labels': french}
     with open('../data/wmt_test', 'wb') as fo:

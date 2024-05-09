@@ -125,7 +125,7 @@ def get_cifar10_data():
     AUTOGRADER_TEST_FILE = '../data/cifar10_test'
 
     train_loader = get_image_classifier_data(AUTOGRADER_TRAIN_FILE)
-    test_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE)
+    test_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE, shuffle=False)
 
     # train_loader is a dataloader. we want to add to it by adding a horizontal flip transform
     train_loader.dataset.transform = torchvision.transforms.Compose([
