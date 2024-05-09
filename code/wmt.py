@@ -42,7 +42,7 @@ class WMTModel(torch.nn.Module):
                  nhead: int = 8,
                  vocab_size: int = 1024,
                  dim_feedforward: int = 512,
-                 dropout: float = 0.0):
+                 dropout: float = 0.1):
         super(WMTModel, self).__init__()
         self.transformer = torch.nn.Transformer(d_model=emb_size,
                                        nhead=nhead,

@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import argparse
 import time
 from collections import defaultdict
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -138,6 +139,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             callback(model, epoch)
         if device == 'cuda':
             torch.cuda.empty_cache()
+        sys.stdout.flush()
     if val_loader is not None:
         return {
             'loss': losses, 'acc': accuracies, 'val_loss': val_losses, 'val_acc': val_accuracies,
