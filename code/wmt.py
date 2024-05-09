@@ -169,10 +169,9 @@ class WMTModel(torch.nn.Module):
             out_len += len(get_clip_seq(list_candidate[i]))
         precision *= min(1, np.exp(1 - ref_len/out_len))
 
-        if np.random.random() < 0.1:
-            print(tokens_to_string(torch.tensor(get_clip_seq(list_candidate[0])), self.labels_tok))
-            print(tokens_to_string(torch.tensor(get_clip_seq(list_reference[0])), self.labels_tok))
-            print(precision)
+        print(tokens_to_string(torch.tensor(get_clip_seq(list_candidate[0])), self.labels_tok))
+        print(tokens_to_string(torch.tensor(get_clip_seq(list_reference[0])), self.labels_tok))
+        print(precision)
         return precision
     
     def set_data_tok(self, tok):

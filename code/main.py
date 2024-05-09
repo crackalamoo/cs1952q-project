@@ -93,7 +93,6 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             training = train_loader
             proportions.append(1)
         for batch_no, (inputs, labels, idxs) in enumerate(training):
-            print(batch_no)
             model.train()
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
