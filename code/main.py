@@ -124,9 +124,11 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         accuracies.append(train_acc)
         losses.append(np.mean(epoch_losses))
         if val_loader is not None:
+            start_val = time.time()
             val_loss, val_acc = test(model, val_loader,
                                      use_labels_as_input=use_labels_as_input,
                                      max_batch=2 if isinstance(model, WMTModel) else None)
+            val_time += time.time() - start_val
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
             print(

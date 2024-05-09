@@ -109,7 +109,7 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
     fr_freqs = {}
 
     def add_sentence(sentence, freqs, arr, tok):
-        sentence = tok(sentence.lower())
+        sentence = tok(sentence.lower().rstrip(' \n'))
         for token in sentence:
             freqs[token.text] = freqs.get(token.text, 0) + 1
         arr.append(sentence)
@@ -208,7 +208,7 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
     english = []
     french = []
     def get_tokens(sentence, tok):
-        sentence = tok(sentence.lower())
+        sentence = tok(sentence.lower().rstrip(' \n'))
         res = []
         for token in sentence:
             if token.text in en_toks:
