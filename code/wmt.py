@@ -105,19 +105,19 @@ class WMTModel(torch.nn.Module):
         return res
     
     def accuracy(self, logits, labels, max_samples=500):
-        # predicted = torch.argmax(logits, dim=-1)
-        # correct = labels[1:, :]
-        # correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
-        # total = (correct != 0).sum().item()
-        # return correct_predictions / total
+        predicted = torch.argmax(logits, dim=-1)
+        correct = labels[1:, :]
+        correct_predictions = ((predicted == correct) * (correct != 0)).sum().item()
+        total = (correct != 0).sum().item()
+        return correct_predictions / total
 
-        if labels.size(1) > max_samples:
-            bleu_iter = labels[:, :max_samples]
-        else:
-            bleu_iter = labels
-        list_candidate = self.generate_translation_parallel(bleu_iter)
-        list_reference = bleu_iter.transpose(0,1).tolist()
-        return self.bleu(list_candidate, list_reference)
+        # if labels.size(1) > max_samples:
+        #     bleu_iter = labels[:, :max_samples]
+        # else:
+        #     bleu_iter = labels
+        # list_candidate = self.generate_translation_parallel(bleu_iter)
+        # list_reference = bleu_iter.transpose(0,1).tolist()
+        # return self.bleu(list_candidate, list_reference)
 
     def val_bleu(self, val_loader, max_samples=500):
         list_candidate = []

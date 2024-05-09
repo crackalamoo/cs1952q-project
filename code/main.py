@@ -151,7 +151,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     return losses, accuracies, times
 
 
-def test(model, test_loader, use_labels_as_input=False):
+def test(model, test_loader, use_labels_as_input=False, mt_bleu=False):
     model.to("cpu")
     model.eval()
     losses = []
@@ -164,9 +164,9 @@ def test(model, test_loader, use_labels_as_input=False):
             else:
                 outputs = model(inputs)
             losses.append(model.loss(outputs, labels))
-            if not isinstance(model, WMTModel):
+            if not (mt_bleu and isinstance(model, WMTModel)):
                 accuracy.append(model.accuracy(outputs, labels))
-        if isinstance(model, WMTModel):
+        if mt_bleu and isinstance(model, WMTModel):
             accuracy = [ model.val_bleu(test_loader) ]
     test_acc = np.mean(accuracy)
     test_loss = np.mean(losses)
@@ -194,7 +194,7 @@ def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
         train_res['loss'], train_res['acc'], train_res['val_loss'], train_res['val_acc'],
         train_res['times'], train_res['prop'], train_res['rebatch_time'], train_res['val_time'])
 
-    test_loss, test_acc = test(model, test_loader, use_labels_as_input=is_translate)
+    test_loss, test_acc = test(model, test_loader, use_labels_as_input=is_translate, mt_bleu=True)
 
     print(f"Final test accuracy: {test_acc}")
     print(f"Rebatch time: {rebatch_time} s")
