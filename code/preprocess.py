@@ -99,8 +99,18 @@ def pickle_wmt(num_train_samples=100000):
         if i == num_train_samples-1:
             break
     
+    print("Finished tokenizing")
     en_freqs = sorted(en_freqs.items(), key=lambda x: x[1], reverse=True)
     fr_freqs = sorted(fr_freqs.items(), key=lambda x: x[1], reverse=True)
+    print(f'English vocab size: {len(en_freqs)}')
+    print(f'French vocab size: {len(fr_freqs)}')
+
+    fr_vocab_prop = 0.0
+    for i in range(vocab_size):
+        fr_vocab_prop += fr_freqs[i][1]
+    fr_vocab_prop /= sum([x[1] for x in fr_freqs])
+    print(f'French vocab proportion: {fr_vocab_prop}')
+
     for i in range(vocab_size-4):
         en_toks[en_freqs[i][0]] = i+4
         fr_toks[fr_freqs[i][0]] = i+4
@@ -131,10 +141,12 @@ def pickle_wmt(num_train_samples=100000):
                 fr_i.append(fr_toks[token.text])
         english.append(en_i)
         french.append(fr_i)
+    print("Finished creating training set")
 
     trainset = {b'data': english, b'labels': french, b'data_tok': en_toks, b'labels_tok': fr_toks}
     with open('../data/wmt_train', 'wb') as fo:
         pickle.dump(trainset, fo)
+    print("Finished pickling training set")
 
     dataset = load_dataset('wmt/wmt14', data_dir='fr-en', split='validation', streaming=True)
     english = []
@@ -157,9 +169,11 @@ def pickle_wmt(num_train_samples=100000):
                 fr_i.append(fr_toks[token.text])
         english.append(en_i)
         french.append(fr_i)
+    print("Finished creating test set")
     testset = {b'data': english, b'labels': french}
     with open('../data/wmt_test', 'wb') as fo:
         pickle.dump(testset, fo)
+    print("Finished pickling test set")
 
 def collate_language_batch(batch_data):
     in_batch, out_batch, idx_batch = [], [], []
