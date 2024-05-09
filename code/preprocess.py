@@ -198,6 +198,7 @@ def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
         english.append(en_i)
         french.append(fr_i)
     print("Finished creating training set")
+    print(f"Training set size: {len(english)}, {len(french)}")
 
     trainset = {b'data': english, b'labels': french, b'data_tok': en_toks, b'labels_tok': fr_toks}
     with open('../data/wmt_train', 'wb') as fo:
