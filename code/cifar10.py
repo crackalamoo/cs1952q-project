@@ -1,4 +1,5 @@
 import torch
+import torchvision
 from preprocess import get_image_classifier_data
 
 class Cifar10Model(torch.nn.Module):
@@ -24,6 +25,10 @@ class Cifar10Model(torch.nn.Module):
         self.res_fn4 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
         self.res_skip2 = torch.nn.Conv2d(16, 20, 1, stride=1, padding='same')
 
+        self.res_fn5 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
+        self.res_fn6 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
+        self.res_skip3 = torch.nn.Conv2d(20, 20, 1, stride=1, padding='same')
+
         self.conv1 = torch.nn.Conv2d(20, 20, 3, stride=1)
         self.conv2 = torch.nn.Conv2d(20, 20, 3, stride=1)
         
@@ -34,6 +39,8 @@ class Cifar10Model(torch.nn.Module):
         self.batch_norm3 = torch.nn.BatchNorm2d(20)
         self.batch_norm4 = torch.nn.BatchNorm2d(20)
         self.batch_norm5 = torch.nn.BatchNorm2d(20)
+        self.batch_norm6 = torch.nn.BatchNorm2d(20)
+        self.batch_norm7 = torch.nn.BatchNorm2d(20)
 
         self.linear = torch.nn.Linear(20*5*5, self.hidden_layer1)
         self.linear2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
@@ -60,7 +67,6 @@ class Cifar10Model(torch.nn.Module):
 
         out = self.pool_fn(out)
 
-
         # Residual block
         pre_res = out
         out = self.res_fn3(out)
@@ -71,8 +77,18 @@ class Cifar10Model(torch.nn.Module):
         out = self.batch_norm4(out)
         out = torch.nn.functional.relu(out)
 
-        out = self.conv1(out)
+        # Residual block
+        pre_res = out
+        out = self.res_fn5(out)
         out = self.batch_norm5(out)
+        out = torch.nn.functional.relu(out)
+        out = self.res_fn6(out)
+        out = self.res_skip3(pre_res) + out
+        out = self.batch_norm6(out)
+        out = torch.nn.functional.relu(out)
+
+        out = self.conv1(out)
+        out = self.batch_norm7(out)
         out = torch.nn.functional.relu(out)
         out = self.conv2(out)
         out = torch.nn.functional.relu(out)
@@ -110,5 +126,11 @@ def get_cifar10_data():
 
     train_loader = get_image_classifier_data(AUTOGRADER_TRAIN_FILE)
     test_loader = get_image_classifier_data(AUTOGRADER_TEST_FILE)
+
+    # train_loader is a dataloader. we want to add to it by adding a horizontal flip transform
+    train_loader.dataset.transform = torchvision.transforms.Compose([
+        torchvision.transforms.RandomHorizontalFlip(),
+        torchvision.transforms.ColorJitter(brightness=0.2, saturation=0.1),
+    ])
 
     return train_loader, test_loader, None

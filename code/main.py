@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--model", default="wmt")
     parser.add_argument('--samp', action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--samp-prop", type=float, default=0.55)
+    parser.add_argument("--samp-prop", type=float, default=0.35)
     parser.add_argument("--reintroduce", type=float, default=0.2)
     parser.add_argument("--store-loss", type=int, default=2)
     parser.add_argument("--runs", type=int, default=1)
@@ -75,7 +75,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     proportions = []
     start_time = time.time()
     rebatch_time = 0.0
-    eval_time = 0.0
+    val_time = 0.0
     for epoch in range(epochs):
         model.to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -91,7 +91,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         else:
             training = train_loader
             proportions.append(1)
-        for inputs, labels, idxs in training:
+        for batch_no, (inputs, labels, idxs) in enumerate(training):
             model.train()
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
@@ -112,11 +112,13 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             epoch_losses.append(loss.item())
-            start_eval = time.time()
-            model.eval()
-            acc_i = model.accuracy(outputs, labels)
-            eval_time += time.time() - start_eval
-            accuracy.append(acc_i)
+            if not isinstance(model, WMTModel) or batch_no < 25:
+                # 25 batches times 20 sample sentences per batch is 500 sample sentences for validation
+                start_val = time.time()
+                model.eval()
+                acc_i = model.accuracy(outputs, labels)
+                val_time += time.time() - start_val
+                accuracy.append(acc_i)
         train_acc = np.mean(accuracy)
         accuracies.append(train_acc)
         losses.append(np.mean(epoch_losses))
@@ -130,7 +132,8 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)
         print(f"Rebatch time: {rebatch_time} s")
-        print(f"Evaluation time: {eval_time} s")
+        print(f"Validation time: {val_time} s")
+        print(f"Total time: {times[-1]} s")
         if callback is not None:
             callback(model, epoch)
         if device == 'cuda':
@@ -138,7 +141,7 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
     if val_loader is not None:
         return {
             'loss': losses, 'acc': accuracies, 'val_loss': val_losses, 'val_acc': val_accuracies,
-            'times': times, 'prop': proportions, 'rebatch_time': rebatch_time, 'eval_time': eval_time
+            'times': times, 'prop': proportions, 'rebatch_time': rebatch_time, 'val_time': val_time
         }
     return losses, accuracies, times
 
@@ -179,15 +182,16 @@ def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
                       use_labels_as_input=is_translate, epochs=EPOCHS,
                       collate_fn=collate_fn, grad_clip=grad_clip,
                       callback=test_translate_callback if is_translate else None)
-    train_loss, train_acc, val_loss, val_acc, train_times, proportions, rebatch_time, eval_time = (
+    train_loss, train_acc, val_loss, val_acc, train_times, proportions, rebatch_time, val_time = (
         train_res['loss'], train_res['acc'], train_res['val_loss'], train_res['val_acc'],
-        train_res['times'], train_res['prop'], train_res['rebatch_time'], train_res['eval_time'])
+        train_res['times'], train_res['prop'], train_res['rebatch_time'], train_res['val_time'])
 
     test_loss, test_acc = test(model, test_loader, use_labels_as_input=is_translate)
 
     print(f"Final test accuracy: {test_acc}")
-    print(f"Total time: {train_times[-1]} s")
     print(f"Rebatch time: {rebatch_time} s")
+    print(f"Validation time: {val_time} s")
+    print(f"Total time: {train_times[-1]} s")
 
     fname = 'samp' if USE_SAMPLING else 'reg'
     with open(f'../results/{fname}.npy', 'wb+' if run_no == 0 else 'ab+') as f:
