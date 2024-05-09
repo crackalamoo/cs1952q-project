@@ -13,7 +13,7 @@ import argparse
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset")
-    parser.add_argument("--vocab_size", default=512, type=int)
+    parser.add_argument("--vocab_size", default=1024, type=int)
     args = parser.parse_args()
     vocab_size = args.vocab_size
 
@@ -75,7 +75,7 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_train_samples=10000):
+def pickle_wmt(num_train_samples=100000):
     en_tok = spacy.load('en_core_web_sm')
     fr_tok = spacy.load('fr_core_news_sm')
 
@@ -175,7 +175,7 @@ def collate_language_batch(batch_data):
     out_batch = torch.nn.utils.rnn.pad_sequence(out_batch, padding_value=0)
     return in_batch, out_batch, idx_batch
 
-def get_language_model_data(file_path, batch_size=128, shuffle=True, include_tok=False):
+def get_language_model_data(file_path, batch_size=64, shuffle=True, include_tok=False):
     """
     Given a file path, returns an array of input sequences and an array of label sequences.
     """
