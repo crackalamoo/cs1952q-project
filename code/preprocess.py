@@ -24,6 +24,26 @@ def unpickle(file):
         dict = pickle.load(fo, encoding='bytes')
     return dict
 
+def pickle_cifar10():
+    transform = transforms.Compose(
+    [transforms.ToTensor(),
+     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                        download=True, transform=transform)
+    trainset.data = trainset.data.tolist()
+    trainset = {b'data': trainset.data, b'labels': trainset.targets}
+    with open('../data/cifar10_train', 'wb') as fo:
+        pickle.dump(trainset, fo)
+    
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                        download=True, transform=transform)
+    testset.data = testset.data.tolist()
+    testset = {b'data': testset.data, b'labels': testset.targets}
+    with open('../data/cifar10_test', 'wb') as fo:
+        pickle.dump(testset, fo)
+    
+    shutil.rmtree('./data')
+
 def pickle_mnist():
     transform = transforms.Compose(
     [transforms.ToTensor(),
@@ -76,7 +96,7 @@ def get_image_classifier_data(file_path, classes=None, num_channels=3, image_siz
 
     return data_loader
 
-def pickle_wmt(num_wmt_samples=30000, num_30k_samples=30000):
+def pickle_wmt(num_wmt_samples=29000, num_30k_samples=29000):
     en_tok = spacy.load('en_core_web_sm')
     fr_tok = spacy.load('fr_core_news_sm')
 
@@ -162,7 +182,7 @@ def pickle_wmt(num_wmt_samples=30000, num_30k_samples=30000):
 
     english = []
     french = []
-    for i in range(num_wmt_samples + num_30k_samples):
+    for i in range(len(english_spacy)):
         en_i = []
         fr_i = []
         for token in english_spacy[i]:
@@ -262,3 +282,5 @@ if __name__ == '__main__':
         pickle_mnist()
     elif args.dataset == 'wmt':
         pickle_wmt()
+    elif args.dataset == 'cifar10':
+        pickle_cifar10()

@@ -181,7 +181,7 @@ class WMTModel(torch.nn.Module):
 
     def generate_translation(self, sentence, use_tokens=False, max_len=70):
         if not use_tokens:
-            inputs = convert_to_tokens(sentence, self.data_tok)
+            inputs = convert_to_tokens(sentence.lower(), self.data_tok)
         else:
             inputs = sentence
         res = [self.labels_tok['<bos>']]
