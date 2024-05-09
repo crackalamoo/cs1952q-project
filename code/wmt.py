@@ -41,7 +41,7 @@ class WMTModel(torch.nn.Module):
                  emb_size: int = 512,
                  nhead: int = 8,
                  vocab_size: int = 4096,
-                 dim_feedforward: int = 512,
+                 dim_feedforward: int = 1024,
                  dropout: float = 0.1):
         super(WMTModel, self).__init__()
         self.transformer = torch.nn.Transformer(d_model=emb_size,
@@ -90,14 +90,14 @@ class WMTModel(torch.nn.Module):
                           tgt_mask)
     
     def loss(self, logits, labels):
-        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=0)
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=0, label_smoothing=0.1)
         logits = logits.transpose(0,1).transpose(1,2)
         labels = labels[1:, :].transpose(0,1) # exclude first token, which is only used as input
         res = loss_fn(logits, labels)
         return res
 
     def batch_losses(self, logits, labels):
-        loss_fn = torch.nn.CrossEntropyLoss(reduction='none', ignore_index=0)
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='none', ignore_index=0, label_smoothing=0.1)
         logits = logits.transpose(0,1).transpose(1,2)
         labels = labels[1:, :].transpose(0,1)
         res = loss_fn(logits, labels)
