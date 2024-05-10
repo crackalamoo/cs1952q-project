@@ -160,6 +160,8 @@ def pickle_wmt(num_wmt_samples=0, num_30k_samples=29000, lang='fr'):
     fr_freqs = sorted(fr_freqs.items(), key=lambda x: x[1], reverse=True)
     print(f'English vocab size: {len(en_freqs)}')
     print(f'French vocab size: {len(fr_freqs)}')
+    en_vocab_size = len(en_freqs)
+    fr_vocab_size = len(fr_freqs)
 
     fr_vocab_prop = 0.0
     for i in range(vocab_size):
@@ -167,8 +169,9 @@ def pickle_wmt(num_wmt_samples=0, num_30k_samples=29000, lang='fr'):
     fr_vocab_prop /= sum([x[1] for x in fr_freqs])
     print(f'French vocab proportion: {fr_vocab_prop}')
 
-    for i in range(vocab_size-4):
+    for i in range(en_vocab_size):
         en_toks[en_freqs[i][0]] = i+4
+    for i in range(fr_vocab_size):
         fr_toks[fr_freqs[i][0]] = i+4
     en_toks['<pad>'] = 0
     fr_toks['<pad>'] = 0

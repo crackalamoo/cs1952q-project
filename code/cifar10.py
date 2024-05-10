@@ -3,7 +3,7 @@ import torchvision
 from preprocess import get_image_classifier_data
 
 class Cifar10Model(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, extras=None):
         super(Cifar10Model, self).__init__()
 
         self.batch_size = 64

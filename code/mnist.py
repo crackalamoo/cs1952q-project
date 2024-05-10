@@ -2,7 +2,7 @@ import torch
 from preprocess import get_image_classifier_data
 
 class MNISTModel(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, extras=None):
         super(MNISTModel, self).__init__()
 
         self.batch_size = 64

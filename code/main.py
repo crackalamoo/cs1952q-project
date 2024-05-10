@@ -174,7 +174,7 @@ def test(model, test_loader, use_labels_as_input=False, mt_bleu=False):
 def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
     train_loader, test_loader, extras = get_data()
 
-    model = ModelClass()
+    model = ModelClass(extras=extras)
     is_translate = isinstance(model, WMTModel)
     if is_translate:
         model.set_data_tok(extras['data_tok'])

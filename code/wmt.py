@@ -42,7 +42,8 @@ class WMTModel(torch.nn.Module):
                  nhead: int = 8,
                  vocab_size: int = 4096,
                  dim_feedforward: int = 512,
-                 dropout: float = 0.1):
+                 dropout: float = 0.1,
+                 extras=None):
         super(WMTModel, self).__init__()
         self.transformer = torch.nn.Transformer(d_model=emb_size,
                                        nhead=nhead,
@@ -51,8 +52,8 @@ class WMTModel(torch.nn.Module):
                                        dim_feedforward=dim_feedforward,
                                        dropout=dropout)
         self.generator = torch.nn.Linear(emb_size, vocab_size)
-        self.src_tok_emb = TokenEmbedding(vocab_size, emb_size)
-        self.tgt_tok_emb = TokenEmbedding(vocab_size, emb_size)
+        self.src_tok_emb = TokenEmbedding(vocab_size if extras is None else len(extras['data_tok']), emb_size)
+        self.tgt_tok_emb = TokenEmbedding(vocab_size if extras is None else len(extras['labels_tok']), emb_size)
         self.positional_encoding = PositionalEncoding(
             emb_size, dropout=dropout)
         self.data_tok = None
