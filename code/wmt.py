@@ -51,7 +51,7 @@ class WMTModel(torch.nn.Module):
                                        num_decoder_layers=num_decoder_layers,
                                        dim_feedforward=dim_feedforward,
                                        dropout=dropout)
-        self.generator = torch.nn.Linear(emb_size, vocab_size)
+        self.generator = torch.nn.Linear(emb_size, vocab_size if extras is None else len(extras['labels_tok']), emb_size)
         self.src_tok_emb = TokenEmbedding(vocab_size if extras is None else len(extras['data_tok']), emb_size)
         self.tgt_tok_emb = TokenEmbedding(vocab_size if extras is None else len(extras['labels_tok']), emb_size)
         self.positional_encoding = PositionalEncoding(
