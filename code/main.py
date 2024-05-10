@@ -133,14 +133,13 @@ def train(model, train_loader, val_loader=None, epochs=EPOCHS, use_sampling=USE_
         else:
             print(f"Epoch: {epoch}, Training Accuracy: {train_acc}")
         times.append(time.time() - start_time)
-        print(f"Rebatch time: {rebatch_time} s")
-        print(f"Validation time: {val_time} s")
-        print(f"Total time: {times[-1]} s")
         if callback is not None:
             callback(model, epoch)
         if device == 'cuda':
             torch.cuda.empty_cache()
-        sys.stdout.flush()
+    print(f"Rebatch time: {rebatch_time} s")
+    print(f"Validation time: {val_time} s")
+    print(f"Total time: {times[-1]} s")
     if val_loader is not None:
         return {
             'loss': losses, 'acc': accuracies, 'val_loss': val_losses, 'val_acc': val_accuracies,
@@ -204,6 +203,8 @@ def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
         np.save(f, train_times)
         np.save(f, val_loss)
         np.save(f, val_acc)
+        np.save(f, val_time)
+        np.save(f, rebatch_time)
     
 
 def do_graph():
@@ -212,10 +213,12 @@ def do_graph():
         total_loss = []
         total_acc = []
         with open(f'../results/{fname}.npy', 'rb') as f:
-            for i in range(RUNS):
+            for _ in range(RUNS):
                 reg_times = np.load(f)
                 reg_loss = np.load(f)
                 reg_acc = np.load(f)
+                eval_time = np.load(f)
+                rebatch_time = np.load(f)
                 total_times.append(reg_times)
                 total_loss.append(reg_loss)
                 total_acc.append(reg_acc)
