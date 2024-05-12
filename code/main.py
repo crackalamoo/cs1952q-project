@@ -241,8 +241,10 @@ def do_graph():
         return new_times, mean_loss, mean_acc, stdev_loss, stdev_acc, stderr_loss, stderr_acc
     
     reg_times, reg_loss, reg_acc, reg_stdev_loss, reg_stdev_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
+    print(f"Reg final:stdev acc/loss: {reg_acc[-1]}/{reg_loss[-1]} : {reg_stdev_acc}/{reg_stdev_loss}")
     if USE_SAMPLING:
         cur_times, cur_loss, cur_acc, cur_stdev_loss, cur_stdev_acc, cur_stderr_loss, cur_stderr_acc = get_stats('samp')
+        print(f"Cur final:stdev acc/loss: {cur_acc[-1]}/{cur_loss[-1]} : {cur_stdev_acc}/{cur_stdev_loss}")
 
 
     plt.rcParams.update({'font.size': 16})
