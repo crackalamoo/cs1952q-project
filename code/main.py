@@ -17,13 +17,13 @@ from torch.utils.data import DataLoader, Subset
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", default="cpu")
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--model", default="wmt")
+    parser.add_argument("--epochs", type=int, default=12)
+    parser.add_argument("--model", default="mnist")
     parser.add_argument('--samp', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--samp-prop", type=float, default=0.35)
     parser.add_argument("--reintroduce", type=float, default=0.2)
     parser.add_argument("--store-loss", type=int, default=2)
-    parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--runs", type=int, default=3)
     args = parser.parse_args()
 
     EPOCHS = args.epochs
