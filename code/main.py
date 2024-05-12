@@ -248,7 +248,7 @@ def do_graph():
         rebatch_times = np.array(rebatch_times)
         val_times = np.array(val_times)
         if total_loss.shape[0] == 1:
-            return new_times, mean_loss, mean_acc, 0, 0, 0, 0, total_times, val_times, rebatch_times
+            return new_times, mean_loss, mean_acc, 0, 0, 0, 0, total_times, val_times, rebatch_times, test_accs, test_losses
         stdev_loss = np.std(total_loss, axis=0, ddof=1)
         stdev_acc = np.std(total_acc, axis=0, ddof=1)
         stderr_loss = stdev_loss/np.sqrt(total_loss.shape[0])

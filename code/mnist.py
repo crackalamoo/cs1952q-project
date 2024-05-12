@@ -16,17 +16,18 @@ class MNISTModel(torch.nn.Module):
         self.dropout_rate = 0.25
 
         self.conv_fn1 = torch.nn.Conv2d(1, 16, 5, stride=2, padding=2)
-        self.conv_fn2 = torch.nn.Conv2d(16, 20, 5, stride=2, padding=2)
+        self.conv_fn2 = torch.nn.Conv2d(16, 20, 3, stride=1, padding='same')
         self.conv_fn3 = torch.nn.Conv2d(20, 20, 3, stride=1, padding='same')
         pool_fn1 = torch.nn.MaxPool2d(3, stride=2)
+        pool_fn2 = torch.nn.MaxPool2d(2, stride=1)
         self.batch_norm1 = torch.nn.BatchNorm2d(16)
         self.batch_norm2 = torch.nn.BatchNorm2d(20)
         self.batch_norm3 = torch.nn.BatchNorm2d(20)
 
-        self.conv_fns = [self.conv_fn1]
-        self.pool_fns = [pool_fn1]
+        self.conv_fns = [self.conv_fn1, self.conv_fn2, self.conv_fn3]
+        self.pool_fns = [pool_fn1, pool_fn2, lambda x: x]
         self.dropout = torch.nn.Dropout(self.dropout_rate)
-        self.linear = torch.nn.Linear(16*6*6, self.hidden_layer1)
+        self.linear = torch.nn.Linear(20*5*5, self.hidden_layer1)
         self.hidden1 = torch.nn.Linear(self.hidden_layer1, self.hidden_layer1)
         self.hidden2 = torch.nn.Linear(self.hidden_layer1, self.num_classes)
         self.linears = [self.linear, self.hidden2]
