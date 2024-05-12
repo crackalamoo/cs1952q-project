@@ -205,6 +205,8 @@ def do_run(ModelClass, get_data, run_no=0, grad_clip=False, collate_fn=None):
         np.save(f, val_acc)
         np.save(f, val_time)
         np.save(f, rebatch_time)
+        np.save(f, test_acc)
+        np.save(f, test_loss)
     
 
 def do_graph():
@@ -212,16 +214,27 @@ def do_graph():
         total_times = []
         total_loss = []
         total_acc = []
+        val_times = []
+        rebatch_times = []
+        test_accs = []
+        test_losses = []
         with open(f'../results/{fname}.npy', 'rb') as f:
             for _ in range(RUNS):
                 reg_times = np.load(f)
                 reg_loss = np.load(f)
                 reg_acc = np.load(f)
-                eval_time = np.load(f)
+                val_time = np.load(f)
                 rebatch_time = np.load(f)
+                test_acc = np.load(f)
+                test_loss = np.load(f)
                 total_times.append(reg_times)
                 total_loss.append(reg_loss)
                 total_acc.append(reg_acc)
+                val_times.append(val_time)
+                rebatch_times.append(rebatch_time)
+                test_accs.append(test_acc)
+                test_losses.append(test_loss)
+        total_times = np.array(total_times)
         new_times = np.linspace(np.min(total_times), np.max(total_times), 1000)
         def get_extrapolated_values(times, values):
             new_values = np.interp(new_times, times, values)
@@ -232,19 +245,33 @@ def do_graph():
         total_acc = np.array(total_acc)
         mean_loss = np.mean(total_loss, axis=0)
         mean_acc = np.mean(total_acc, axis=0)
+        rebatch_times = np.array(rebatch_times)
+        val_times = np.array(val_times)
         if total_loss.shape[0] == 1:
-            return new_times, mean_loss, mean_acc, 0, 0, 0, 0
+            return new_times, mean_loss, mean_acc, 0, 0, 0, 0, total_times, val_times, rebatch_times
         stdev_loss = np.std(total_loss, axis=0, ddof=1)
         stdev_acc = np.std(total_acc, axis=0, ddof=1)
         stderr_loss = stdev_loss/np.sqrt(total_loss.shape[0])
         stderr_acc =stdev_acc/np.sqrt(total_acc.shape[0])
-        return new_times, mean_loss, mean_acc, stdev_loss, stdev_acc, stderr_loss, stderr_acc
+        return new_times, mean_loss, mean_acc, stdev_loss, stdev_acc, stderr_loss, stderr_acc, total_times, val_times, rebatch_times, test_accs, test_losses
     
-    reg_times, reg_loss, reg_acc, reg_stdev_loss, reg_stdev_acc, reg_stderr_loss, reg_stderr_acc = get_stats('reg')
-    print(f"Reg final:stdev acc/loss: {reg_acc[-1]}/{reg_loss[-1]} : {reg_stdev_acc}/{reg_stdev_loss}")
+    reg_times, reg_loss, reg_acc, reg_stdev_loss, reg_stdev_acc, reg_stderr_loss, reg_stderr_acc, reg_all_t, reg_val_t, reg_rebatch_t, reg_test_acc, reg_test_l = get_stats('reg')
+    print(f"Reg final:stdev acc/loss: {np.mean(reg_test_acc)}/{np.mean(reg_test_l)} : {np.std(reg_test_acc, ddof=1)}/{np.std(reg_test_l, ddof=1)}")
+    if RUNS > 1:
+        reg_remaining_t = reg_all_t[:,-1] - reg_val_t - reg_val_t - reg_rebatch_t
+        print(f"Reg overall times: {np.mean(reg_all_t[:,-1])} ± {np.std(reg_all_t[:,-1], ddof=1)}")
+        print(f"Reg val times: {np.mean(reg_val_t)} ± {np.std(reg_val_t, ddof=1)}")
+        print(f"Reg rebatch times: {np.mean(reg_rebatch_t)} ± {np.std(reg_rebatch_t, ddof=1)}")
+        print(f"Reg remaining times: {np.mean(reg_remaining_t)} ± {np.std(reg_remaining_t, ddof=1)}")
     if USE_SAMPLING:
-        cur_times, cur_loss, cur_acc, cur_stdev_loss, cur_stdev_acc, cur_stderr_loss, cur_stderr_acc = get_stats('samp')
-        print(f"Cur final:stdev acc/loss: {cur_acc[-1]}/{cur_loss[-1]} : {cur_stdev_acc}/{cur_stdev_loss}")
+        cur_times, cur_loss, cur_acc, cur_stdev_loss, cur_stdev_acc, cur_stderr_loss, cur_stderr_acc, cur_all_t, cur_val_t, cur_rebatch_t, cur_test_acc, cur_test_l = get_stats('samp')
+        print(f"Cur final:stdev acc/loss: {np.mean(cur_test_acc)}/{np.mean(cur_test_l)} : {np.std(cur_test_acc, ddof=1)}/{np.std(cur_test_l, ddof=1)}")
+        if RUNS > 1:
+            cur_remaining_t = cur_all_t[:,-1] - cur_val_t - cur_val_t - cur_rebatch_t
+            print(f"Cur overall times: {np.mean(cur_all_t[:,-1])} ± {np.std(cur_all_t[:,-1], ddof=1)}")
+            print(f"Cur val times: {np.mean(cur_val_t)} ± {np.std(cur_val_t, ddof=1)}")
+            print(f"Cur rebatch times: {np.mean(cur_rebatch_t)} ± {np.std(cur_rebatch_t, ddof=1)}")
+            print(f"Cur remaining times: {np.mean(cur_remaining_t)} ± {np.std(cur_remaining_t, ddof=1)}")
 
 
     plt.rcParams.update({'font.size': 16})
