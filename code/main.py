@@ -277,10 +277,10 @@ def do_graph():
     plt.rcParams.update({'font.size': 16})
     plt.figure(figsize=(5.6,4.2), dpi=200)
     if USE_SAMPLING:
-        plt.plot(cur_times, cur_acc, label='sampling', color='tab:orange')
+        plt.plot(cur_times, cur_acc, label='subsets', color='tab:orange')
         # plt.fill_between(cur_times, cur_acc-cur_stderr_acc, cur_acc+cur_stderr_acc, alpha=0.3, color='tab:orange')
         plt.fill_between(cur_times, cur_acc-cur_stdev_acc, cur_acc+cur_stdev_acc, alpha=0.15, color='tab:orange')
-    plt.plot(reg_times, reg_acc, label='no sampling', color='tab:blue')
+    plt.plot(reg_times, reg_acc, label='no subsets', color='tab:blue')
     # plt.fill_between(reg_times, reg_acc-reg_stderr_acc, reg_acc+reg_stderr_acc, alpha=0.3, color='tab:blue')
     plt.fill_between(reg_times, reg_acc-reg_stdev_acc, reg_acc+reg_stdev_acc, alpha=0.15, color='tab:blue')
     # plt.plot(cur_times[STORED_LOSSES:],
@@ -292,10 +292,10 @@ def do_graph():
 
     plt.figure(figsize=(5.6,4.2), dpi=200)
     if USE_SAMPLING:
-        plt.plot(cur_times, cur_loss, label='sampling', color='tab:orange')
+        plt.plot(cur_times, cur_loss, label='subsets', color='tab:orange')
         # plt.fill_between(cur_times, cur_loss-cur_stderr_loss, cur_loss+cur_stderr_loss, alpha=0.3, color='tab:orange')
         plt.fill_between(cur_times, cur_loss-cur_stdev_loss, cur_loss+cur_stdev_loss, alpha=0.15, color='tab:orange')
-    plt.plot(reg_times, reg_loss, label='no sampling', color='tab:blue')
+    plt.plot(reg_times, reg_loss, label='no subsets', color='tab:blue')
     # plt.fill_between(reg_times, reg_loss-reg_stderr_loss, reg_loss+reg_stderr_loss, alpha=0.3, color='tab:blue')
     plt.fill_between(reg_times, reg_loss-reg_stdev_loss, reg_loss+reg_stdev_loss, alpha=0.15, color='tab:blue')
     plt.xlabel('Time (s)')
